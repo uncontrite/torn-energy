@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	gcache "github.com/patrickmn/go-cache"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
+	"log"
 	"os"
 	"os/signal"
 	"strconv"
@@ -43,7 +43,7 @@ func UpdateUser(tornClient *TornClient, cache *gcache.Cache, producer *kafka.Pro
 	cachedUser, _ := cache.Get(userKey)
 	cache.Set(userKey, *user, gcache.NoExpiration)
 	if !user.Equals(cachedUser) {
-		fmt.Printf("User updated:\n  Old:%+v\n  New:%+v\n\n", cachedUser, *user)
+		log.Printf("User updated:\n  Old:%+v\n  New:%+v\n\n", cachedUser, *user)
 		// Produce messages to topic (asynchronously)
 		userJson, err := json.Marshal(user)
 		if err != nil {
@@ -75,8 +75,8 @@ func main() {
 
 	go func() {
 		sig := <-sigs
-		fmt.Println()
-		fmt.Println("Received termination signal: ", sig)
+		log.Println()
+		log.Println("Received termination signal: ", sig)
 		done <- true
 	}()
 
@@ -90,7 +90,7 @@ func main() {
 
 	producer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": *bootstrapServer})
 	if err != nil {
-		fmt.Printf("Failed to create producer: %s\n", err)
+		log.Printf("Failed to create producer: %s\n", err)
 		os.Exit(1)
 	}
 	defer producer.Close()
@@ -101,13 +101,13 @@ func main() {
 			switch ev := e.(type) {
 			case *kafka.Message:
 				if ev.TopicPartition.Error != nil {
-					fmt.Printf("Delivery failed: %v\n", ev.TopicPartition)
+					log.Printf("Delivery failed: %v\n", ev.TopicPartition)
 				} else {
-					fmt.Printf("Delivered message to %v\n", ev.TopicPartition)
+					log.Printf("Delivered message to %v\n", ev.TopicPartition)
 				}
 				break
 			default:
-				fmt.Printf("Ignored event: %s\n", ev)
+				log.Printf("Ignored event: %s\n", ev)
 				break
 			}
 		}
@@ -126,24 +126,24 @@ func main() {
 			ticker := tickersByUser[tu]
 			for t := range ticker.C {
 				truncatedApiKey := tu.TornApiKey[:4]
-				fmt.Printf("Job started: %s at %s\n", truncatedApiKey, t)
+				log.Printf("Job started: %s at %s\n", truncatedApiKey, t)
 				userId, err := UpdateUser(tornClient, cache, producer, tu.TornApiKey)
 				if err != nil {
 					if errExt, ok := err.(*TornErrorExt); ok {
 						if errExt.Remove {
-							fmt.Printf("Job failed permanently: error=%s, key=%s\n", errExt.Text, truncatedApiKey)
+							log.Printf("Job failed permanently: error=%s, key=%s\n", errExt.Text, truncatedApiKey)
 							ticker.Stop()
 							tickersByUser[tu] = nil
 							return
 						} else if errExt.Delay {
-							fmt.Printf("Job failed, delay requested: error=%s, key=%s\n", errExt.Text, truncatedApiKey)
+							log.Printf("Job failed, delay requested: error=%s, key=%s\n", errExt.Text, truncatedApiKey)
 							time.Sleep(tu.Frequency * 2)
 						}
 					} else {
-						fmt.Printf("Job failed: Unable to fetch user: %s\n", err)
+						log.Printf("Job failed: Unable to fetch user: %s\n", err)
 					}
 				} else {
-					fmt.Printf("Job succeeded: user=%d\n", *userId)
+					log.Printf("Job succeeded: user=%d\n", *userId)
 				}
 			}
 		}(tu)
@@ -159,17 +159,17 @@ func main() {
 				}
 			}
 			if activeTickers == 0 {
-				fmt.Println("Signaling exit as all jobs have been stopped.")
+				log.Println("Signaling exit as all jobs have been stopped.")
 				done <- true
 			}
 			time.Sleep(time.Millisecond * 100)
 		}
 	}()
 
-	fmt.Println("Application initialised; awaiting termination signal.")
+	log.Println("Application initialised; awaiting termination signal.")
 	<-done
-	fmt.Println("Flushing Kafka producer before exiting...")
+	log.Println("Flushing Kafka producer before exiting...")
 	unflushedEvents := producer.Flush(15000)
-	fmt.Printf("Exiting; unflushedEvents=%d", unflushedEvents)
-	fmt.Println()
+	log.Printf("Exiting; unflushedEvents=%d", unflushedEvents)
+	log.Println()
 }
