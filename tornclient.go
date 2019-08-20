@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"time"
 )
@@ -16,8 +17,8 @@ type TornClient struct {
 
 func NewTornClient() *TornClient {
 	transport := &http.Transport{
-		MaxIdleConns:       10,
-		IdleConnTimeout:    30 * time.Second,
+		MaxIdleConns:    10,
+		IdleConnTimeout: 30 * time.Second,
 	}
 	client := &http.Client{
 		Transport: transport,
@@ -31,14 +32,14 @@ type TornErrorResponse struct {
 }
 
 type TornError struct {
-	Code uint `json:"code,omitempty"`
+	Code  uint   `json:"code,omitempty"`
 	Error string `json:"error,omitempty"`
 }
 
 type TornErrorExt struct {
-	Text string
+	Text   string
 	Remove bool // Remove from pool
-	Delay bool // Delay next request
+	Delay  bool // Delay next request
 }
 
 func (e *TornErrorExt) Error() string {
@@ -84,9 +85,16 @@ func (tc TornClient) GetUser(apiKey string) (*User, *TornErrorResponse, error) {
 	req.Header.Add("Accept", "application/json")
 
 	resp, err := tc.Client.Do(req)
-	defer resp.Body.Close()
 	if err != nil {
 		return nil, nil, err
+	}
+	if resp.Body != nil {
+		defer func() {
+			err := resp.Body.Close()
+			if err != nil {
+				log.Printf("Unable to close Response body: %s\n", err)
+			}
+		}()
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
