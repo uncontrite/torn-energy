@@ -155,12 +155,20 @@ func RunProducer(bootstrapServer string, apiKeys []string, done chan bool) {
 	log.Printf("Flushed events: remaining=%d\n", unflushedEvents)
 }
 
-func main() {
+type Args struct {
+	BootstrapServer string
+	ApiKeys []string
+}
+
+func ParseCliArgs() Args {
 	// Parse args
 	bootstrapServer := flag.String("bootstrap-server", "127.0.0.1", "Kafka bootstrap server")
 	flag.Parse()
 	apiKeys := flag.Args()
-
+	args := Args{BootstrapServer: *bootstrapServer, ApiKeys: apiKeys}
+	return args
+}
+func CreateIntTermChannel() chan bool {
 	// Signal handling
 	sigs := make(chan os.Signal, 1)
 	done := make(chan bool, 1)
@@ -172,8 +180,14 @@ func main() {
 		log.Println("Received termination signal: ", sig)
 		done <- true
 	}()
+	return done
+}
+
+func main() {
+	args := ParseCliArgs()
+	intTermChan := CreateIntTermChannel()
 
 	log.Println("Application initialised; awaiting termination signal.")
-	RunProducer(*bootstrapServer, apiKeys, done)
+	RunProducer(args.BootstrapServer, args.ApiKeys, intTermChan)
 	log.Println("Application stopping.")
 }
