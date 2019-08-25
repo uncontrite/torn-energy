@@ -23,7 +23,7 @@ Features:
 type Args struct {
 	Producer *ProducerArgs
 	Consumer *ConsumerArgs
-	ReportArgs *ReportArgs
+	Report   *ReportArgs
 }
 
 type ConsumerArgs struct {
@@ -56,7 +56,7 @@ func ParseCliArgs() Args {
 		return Args{Consumer: &consumerArgs}
 	} else if report {
 		args := ReportArgs{RethinkdbServer: rethinkDbServer}
-		return Args{ReportArgs: &args}
+		return Args{Report: &args}
 	}
 	// Producer mode
 	apiKeys := flag.Args()
@@ -89,6 +89,9 @@ func main() {
 	} else if args.Consumer != nil {
 		log.Println("Running in consumer mode.")
 		RunConsumer(*args.Consumer, intTermChan)
+	} else if args.Report != nil {
+		log.Println("Running in report mode.")
+
 	} else {
 		log.Println("Invalid arguments provided")
 	}

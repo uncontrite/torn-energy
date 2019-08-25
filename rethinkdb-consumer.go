@@ -8,8 +8,6 @@ import (
 	"os"
 	"sync/atomic"
 	"time"
-	r "gopkg.in/rethinkdb/rethinkdb-go.v5"
-
 )
 
 func SetUpConsumer(bootstrapServer string) (*kafka.Consumer, func()) {
@@ -55,13 +53,6 @@ func CountingConsumer(consumer *kafka.Consumer) {
 	}()
 }
 
-type RethinkTornUser struct {
-	Id int64 `rethinkdb:"id"`
-	Offset int64 `rethinkdb:"offset"`
-	Timestamp time.Time `rethinkdb:"timestamp,omitempty"`
-	Document interface{} `rethinkdb:"document,omitempty"`
-}
-
 func ToRethinkTornUser(msg *kafka.Message) (*RethinkTornUser, error) {
 	var tUser User
 	err := json.Unmarshal(msg.Value, &tUser)
@@ -76,21 +67,7 @@ func ToRethinkTornUser(msg *kafka.Message) (*RethinkTornUser, error) {
 	}, nil
 }
 
-func UserExistsInDb(session *r.Session, offset kafka.Offset) (bool, error) {
-	// TODO: Replace with channel
-	cursor, err := r.DB("TornEnergy").Table("User").Get(offset).
-		Field("id").
-		Default(nil).
-		Run(session)
-	if err != nil {
-		return false, err
-	}
-	var row interface{}
-	err = cursor.One(&row)
-	return err != r.ErrEmptyResult, nil
-}
-
-func RethinkdbStoringConsumer(consumer *kafka.Consumer, session *r.Session) {
+func RethinkdbStoringConsumer(consumer *kafka.Consumer, userDao UserDao) {
 	var kerrs uint64
 	go func() {
 		for {
@@ -102,7 +79,7 @@ func RethinkdbStoringConsumer(consumer *kafka.Consumer, session *r.Session) {
 				continue
 			}
 			offset := msg.TopicPartition.Offset
-			stored, err := UserExistsInDb(session, offset)
+			stored, err := userDao.Exists(int64(offset))
 			if err != nil {
 				log.Printf("ERR: Unable to determine if User already exists: offset=%d, err=%s\n", offset, err)
 				continue
@@ -116,18 +93,13 @@ func RethinkdbStoringConsumer(consumer *kafka.Consumer, session *r.Session) {
 				log.Printf("ERR: Unable to convert Kafka message to Rethink model: offset=%d, err=%s\n", offset, err)
 				continue
 			}
-			response, err := r.DB("TornEnergy").Table("User").
-				Insert(dbUser).
-				RunWrite(session)
+			err = userDao.Insert(*dbUser)
 			if err != nil {
-				log.Printf("ERR: Unable to insert User into db: offset=%d, err=%s\n", offset, err)
+				log.Printf("ERR: Unable to insert User into db: user=%+v\n", dbUser)
 				continue
-			} else if response.Inserted > 0 {
-				log.Printf("Wrote User to db: offset=%d\n", offset)
-			} else {
-				log.Printf("ERR: Unable to insert User into db (?): offset=%+v\n", response)
 			}
-			time.Sleep(time.Millisecond * 75)
+			log.Printf("Wrote User to db: user=%+v\n", dbUser)
+			time.Sleep(time.Millisecond * 50)
 		}
 	}()
 }
@@ -135,14 +107,9 @@ func RethinkdbStoringConsumer(consumer *kafka.Consumer, session *r.Session) {
 func RunConsumer(args ConsumerArgs, done chan bool) {
 	consumer, closer := SetUpConsumer(args.BootstrapServer)
 	defer closer()
-	r.SetTags("rethinkdb", "json")
-	session, err := r.Connect(r.ConnectOpts{
-		Address: args.RethinkdbServer,
-	})
-	if err != nil {
-		log.Fatalln(err)
-	}
-	RethinkdbStoringConsumer(consumer, session)
+	session := SetUpDb(args.RethinkdbServer)
+	userDao := RethinkdbUserDao{Session: session}
+	RethinkdbStoringConsumer(consumer, userDao)
 	<-done
 	partitions, err := consumer.Commit()
 	if err != nil {
