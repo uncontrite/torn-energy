@@ -62,24 +62,7 @@ func UpdateUser(tornClient *TornClient, cache *gcache.Cache, producer *kafka.Pro
 	return &user.UserId, nil
 }
 
-func main() {
-	// Parse args
-	bootstrapServer := flag.String("bootstrap-server", "127.0.0.1", "Kafka bootstrap server")
-	flag.Parse()
-	apiKeys := flag.Args()
-
-	// Signal handling
-	sigs := make(chan os.Signal, 1)
-	done := make(chan bool, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		sig := <-sigs
-		log.Println()
-		log.Println("Received termination signal: ", sig)
-		done <- true
-	}()
-
+func RunProducer(bootstrapServer string, apiKeys []string, done chan bool) {
 	// Global setup
 	var trackerUsers []TrackerUser
 	for _, apiKey := range apiKeys {
@@ -88,7 +71,7 @@ func main() {
 	var tornClient = NewTornClient()
 	var cache = gcache.New(gcache.NoExpiration, gcache.NoExpiration)
 
-	producer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": *bootstrapServer})
+	producer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": bootstrapServer})
 	if err != nil {
 		log.Printf("Failed to create producer: %s\n", err)
 		os.Exit(1)
@@ -166,10 +149,31 @@ func main() {
 		}
 	}()
 
-	log.Println("Application initialised; awaiting termination signal.")
 	<-done
-	log.Println("Flushing Kafka producer before exiting...")
+	log.Println("Flushing Kafka producer before returning...")
 	unflushedEvents := producer.Flush(15000)
-	log.Printf("Exiting; unflushedEvents=%d", unflushedEvents)
-	log.Println()
+	log.Printf("Flushed events: remaining=%d\n", unflushedEvents)
+}
+
+func main() {
+	// Parse args
+	bootstrapServer := flag.String("bootstrap-server", "127.0.0.1", "Kafka bootstrap server")
+	flag.Parse()
+	apiKeys := flag.Args()
+
+	// Signal handling
+	sigs := make(chan os.Signal, 1)
+	done := make(chan bool, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigs
+		log.Println()
+		log.Println("Received termination signal: ", sig)
+		done <- true
+	}()
+
+	log.Println("Application initialised; awaiting termination signal.")
+	RunProducer(*bootstrapServer, apiKeys, done)
+	log.Println("Application stopping.")
 }
