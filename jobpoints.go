@@ -12,12 +12,12 @@ type RawJobPoints struct {
 
 type Job struct {
 	Name string
-	Points uint
+	Points int
 }
 
 func (jp RawJobPoints) ToJobs() ([]Job, error) {
 	var jobs []Job
-	var points uint
+	var points int
 	for jobName, msg := range jp.Jobs {
 		if err := json.Unmarshal([]byte(*msg), &points); err != nil {
 			return nil, err
@@ -28,7 +28,7 @@ func (jp RawJobPoints) ToJobs() ([]Job, error) {
 	for _, msg := range jp.Companies {
 		var jp struct{
 			Name string `json:"name,omitempty"`;
-			JobPoints uint `json:"jobpoints,omitempty"`;
+			JobPoints int `json:"jobpoints,omitempty"`;
 		}
 		if err := json.Unmarshal([]byte(*msg), &jp); err != nil {
 			return nil, err
@@ -58,4 +58,30 @@ func Eq(a, b []Job) bool {
 	}
 
 	return true
+}
+
+func Diff(l, r []Job) []Job {
+	rm := make(map[string]int)
+	for _, j := range r {
+		rm[j.Name] = j.Points
+	}
+	lm := make(map[string]int)
+	for _, j := range l {
+		lm[j.Name] = j.Points
+	}
+	diff := make(map[string]int)
+	for k, _ := range rm {
+		jpdiff := lm[k] - rm[k]
+		if jpdiff != 0 {
+			diff[k] = jpdiff
+		}
+	}
+	var jobs []Job
+	for name, jp := range diff {
+		jobs = append(jobs, Job{name, jp})
+	}
+	sort.SliceStable(jobs, func(i, j int) bool {
+		return jobs[i].Name < jobs[j].Name
+	})
+	return jobs
 }

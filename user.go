@@ -34,16 +34,16 @@ type User struct {
 	Refills Refills `json:"refills,omitempty"`
 }
 
-func (user User) Equals(other interface{}) bool {
+func (u User) Equals(other interface{}) bool {
 	if other == nil {
 		return false
 	}
-	return user.UserId == other.(User).UserId &&
-		user.BattleStats == other.(User).BattleStats &&
-		user.Bars == other.(User).Bars &&
-		Eq(user.Jobs, other.(User).Jobs) &&
-		user.PersonalStats == other.(User).PersonalStats &&
-		user.Refills == other.(User).Refills
+	return u.UserId == other.(User).UserId &&
+		u.BattleStats == other.(User).BattleStats &&
+		u.Bars == other.(User).Bars &&
+		Eq(u.Jobs, other.(User).Jobs) &&
+		u.PersonalStats == other.(User).PersonalStats &&
+		u.Refills == other.(User).Refills
 }
 
 func (raw RawUser) Bars() Bars {
@@ -62,11 +62,11 @@ func (raw RawUser) User() (*User, error) {
 	return &User{raw.PlayerId, raw.BattleStats(), raw.Bars(), jobs, raw.PersonalStats, raw.Refills}, nil
 }
 
-func (user User) MarshalJson() ([]byte, error) {
-	return json.Marshal(user)
+func (u User) MarshalJson() ([]byte, error) {
+	return json.Marshal(u)
 }
 
-func (user *User) UnmarshalJSON(b []byte) error {
+func (u *User) UnmarshalJSON(b []byte) error {
 	// Determine type based on fields
 	responseType, err := GetUserResponseType(b)
 	if err != nil {
@@ -80,7 +80,7 @@ func (user *User) UnmarshalJSON(b []byte) error {
 			innerUser, innerErr := raw.User()
 			err = innerErr
 			if innerUser != nil {
-				*user = *innerUser
+				*u = *innerUser
 			}
 		}
 		break
@@ -88,7 +88,7 @@ func (user *User) UnmarshalJSON(b []byte) error {
 		type User2 User
 		var user2 User2
 		err = json.Unmarshal(b, &user2)
-		*user = User(user2)
+		*u = User(user2)
 		break
 	case "Error":
 		err = errors.New("Unable to convert Torn Error into User: " + string(b))

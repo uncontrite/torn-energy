@@ -45,16 +45,16 @@ func ParseCliArgs() Args {
 	var bootstrapServer string
 	var rethinkDbServer string
 	var consumer bool
-	var report bool
+	var reporter bool
 	flag.StringVar(&bootstrapServer, "bootstrap-server", "127.0.0.1", "Kafka bootstrap server")
 	flag.StringVar(&rethinkDbServer, "rethinkdb-server", "127.0.0.1", "RethinkDB server")
 	flag.BoolVar(&consumer, "consumer", false, "Runs app in consumer mode")
-	flag.BoolVar(&report, "report", false, "Runs app in report mode")
+	flag.BoolVar(&reporter, "reporter", false, "Runs app in reporter mode")
 	flag.Parse()
 	if consumer {
 		consumerArgs := ConsumerArgs{BootstrapServer: bootstrapServer, RethinkdbServer: rethinkDbServer}
 		return Args{Consumer: &consumerArgs}
-	} else if report {
+	} else if reporter {
 		args := ReportArgs{RethinkdbServer: rethinkDbServer}
 		return Args{Report: &args}
 	}
@@ -91,7 +91,7 @@ func main() {
 		RunConsumer(*args.Consumer, intTermChan)
 	} else if args.Report != nil {
 		log.Println("Running in report mode.")
-
+		RunReport(*args.Report, intTermChan)
 	} else {
 		log.Println("Invalid arguments provided")
 	}

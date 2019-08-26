@@ -3,30 +3,64 @@ package main
 import (
 	"errors"
 	"fmt"
-	"gopkg.in/rethinkdb/rethinkdb-go.v5"
+	r "gopkg.in/rethinkdb/rethinkdb-go.v5"
 	"log"
 	"time"
 )
 
 type RethinkTornUser struct {
-	Id int64 `rethinkdb:"id"`
-	Offset int64 `rethinkdb:"offset"`
-	Timestamp time.Time `rethinkdb:"timestamp,omitempty"`
-	Document interface{} `rethinkdb:"document,omitempty"`
+	Id int64 `r:"id"`
+	Offset int64 `r:"offset"`
+	Timestamp time.Time `r:"timestamp,omitempty"`
+	Document User `r:"document,omitempty"`
 }
 
 type UserDao interface {
 	Exists(id int64) (bool, error)
 	Insert(user RethinkTornUser) error
+	GetInRange(id int64, earliest time.Time, latest time.Time) ([]RethinkTornUser, error)
 }
 
 type RethinkdbUserDao struct {
-	Session *rethinkdb.Session
+	Session *r.Session
+}
+
+func (dao RethinkdbUserDao) GetUserIds() ([]int64, error) {
+	m := make(map[string]string)
+	m["document"] = "userId"
+	cursor, err := r.DB("TornEnergy").Table("User").
+		Distinct(r.DistinctOpts{Index: "userId"}).
+		Run(dao.Session)
+	if err != nil {
+		return nil, err
+	}
+	var rows []int64
+	if err = cursor.All(&rows); err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+func (dao RethinkdbUserDao) GetInRange(id int64, earliest time.Time, latest time.Time) ([]RethinkTornUser, error) {
+	cursor, err := r.DB("TornEnergy").Table("User").
+		Between([]interface{}{id, earliest}, []interface{}{id, latest}, r.BetweenOpts{LeftBound: "closed", RightBound: "closed", Index: "userIdTimestamp"}).
+		OrderBy(r.OrderByOpts{Index: "userIdTimestamp"}).
+		Run(dao.Session)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close()
+	var rows []RethinkTornUser
+	err = cursor.All(&rows)
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
 }
 
 func (dao RethinkdbUserDao) Exists(id int64) (bool, error) {
 	// TODO: Replace with channel
-	cursor, err := rethinkdb.DB("TornEnergy").Table("User").Get(id).
+	cursor, err := r.DB("TornEnergy").Table("User").Get(id).
 		Field("id").
 		Default(nil).
 		Run(dao.Session)
@@ -35,11 +69,11 @@ func (dao RethinkdbUserDao) Exists(id int64) (bool, error) {
 	}
 	var row interface{}
 	err = cursor.One(&row)
-	return err != rethinkdb.ErrEmptyResult, nil
+	return err != r.ErrEmptyResult, nil
 }
 
 func (dao RethinkdbUserDao) Insert(user RethinkTornUser) error {
-	response, err := rethinkdb.DB("TornEnergy").Table("User").
+	response, err := r.DB("TornEnergy").Table("User").
 		Insert(user).
 		RunWrite(dao.Session)
 	if err != nil {
@@ -51,9 +85,9 @@ func (dao RethinkdbUserDao) Insert(user RethinkTornUser) error {
 	return nil
 }
 
-func SetUpDb(server string) *rethinkdb.Session {
-	rethinkdb.SetTags("rethinkdb", "json")
-	session, err := rethinkdb.Connect(rethinkdb.ConnectOpts{
+func SetUpDb(server string) *r.Session {
+	r.SetTags("r", "json")
+	session, err := r.Connect(r.ConnectOpts{
 		Address: server,
 	})
 	if err != nil {
