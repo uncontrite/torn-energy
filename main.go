@@ -10,10 +10,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	"torn/thttp"
 	"torn/rethinkdb"
-	"torn/tproducer"
-	"torn/tconsumer"
+	"torn/thttp"
 	"torn/treporter"
 )
 
@@ -30,8 +28,6 @@ Features:
 */
 
 type Args struct {
-	Consumer *tconsumer.Args
-	Producer *ProducerArgs
 	Report   *treporter.Args
 	Server   *ServerArgs
 }
@@ -39,11 +35,6 @@ type Args struct {
 type ServerArgs struct {
 	RethinkdbServer string
 	Port string
-}
-
-type ProducerArgs struct {
-	BootstrapServer string
-	ApiKeys []string
 }
 
 func ParseCliArgs() Args {
@@ -61,10 +52,7 @@ func ParseCliArgs() Args {
 	flag.BoolVar(&reporter, "reporter", false, "Runs app in reporter mode")
 	flag.BoolVar(&server, "server", false, "Runs app in server mode")
 	flag.Parse()
-	if consumer {
-		consumerArgs := tconsumer.Args{BootstrapServer: bootstrapServer, RethinkdbServer: rethinkDbServer}
-		return Args{Consumer: &consumerArgs}
-	} else if reporter {
+	if reporter {
 		args := treporter.Args{RethinkdbServer: rethinkDbServer}
 		return Args{Report: &args}
 	} else if server {
@@ -74,10 +62,7 @@ func ParseCliArgs() Args {
 		}
 		return Args{Server: &args}
 	}
-	// Producer mode
-	apiKeys := flag.Args()
-	producerArgs := ProducerArgs{BootstrapServer: bootstrapServer, ApiKeys: apiKeys}
-	return Args{Producer: &producerArgs}
+	return Args{}
 }
 func CreateIntTermChannel() chan bool {
 	// Signal handling
@@ -99,13 +84,7 @@ func main() {
 	intTermChan := CreateIntTermChannel()
 
 	log.Println("Application initialised; awaiting termination signal.")
-	if args.Producer != nil {
-		log.Println("Running in producer mode.")
-		tproducer.RunProducer(args.Producer.BootstrapServer, args.Producer.ApiKeys, intTermChan)
-	} else if args.Consumer != nil {
-		log.Println("Running in consumer mode.")
-		tconsumer.RunConsumer(*args.Consumer, intTermChan)
-	} else if args.Report != nil {
+	if args.Report != nil {
 		log.Println("Running in reporter mode.")
 		treporter.RunReport(*args.Report, intTermChan)
 	} else if args.Server != nil {
