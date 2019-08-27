@@ -116,6 +116,7 @@ func main() {
 		userDao := rethinkdb.UserDao{Session: session}
 		reporter := treporter.Reporter{UserDao: &userDao}
 		server := thttp.Server{Cache: cash, Reporter: &reporter}
+		server.RefreshCachePeriodically()
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", server.Handler)
 		srv := &http.Server{Addr: args.Server.Port, Handler: mux}

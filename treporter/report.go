@@ -33,7 +33,6 @@ func (r Reporter) CalculateEnergyTrained(earliest time.Time, latest time.Time) (
 	}
 	log.Printf("Found %d distinct User IDs: %v energyTrained", len(userIds), userIds)
 	for _, userId := range userIds {
-		log.Printf("Consuming UserId: %d", userId)
 		userData, err := r.UserDao.GetInRange(userId, earliest, latest)
 		if err != nil {
 			log.Printf("ERR: Unable to get history for User: id=%d, err=%s\n", userId, err)

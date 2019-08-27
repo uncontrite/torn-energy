@@ -10,13 +10,33 @@ import (
 )
 
 const IsoLayout = "2006-01-02"
+const DefaultEarliest = "2019-08-24"
+const DefaultLatest = "2019-08-31"
 
 type Server struct {
 	Cache *cache.Cache
 	Reporter *treporter.Reporter
 }
 
+func (s Server) RefreshCachePeriodically() {
+	earliest, _ := time.Parse(IsoLayout, DefaultEarliest)
+	latest, _ := time.Parse(IsoLayout, DefaultLatest)
+	go func() {
+		log.Println("Starting ET cache update")
+		userEnergy, err := s.Reporter.CalculateEnergyTrained(earliest, latest)
+		if err != nil {
+			log.Printf("ERR: Unable to refresh cache on interval: %v", err)
+			time.Sleep(time.Second * 10)
+		} else {
+			log.Println("Successfully updated ET cache")
+			s.Cache.Set("t", userEnergy, time.Minute * 1)
+			time.Sleep(time.Second * 30)
+		}
+	}()
+}
+
 func (s Server) Handler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Page requested: %s\n", r.Header.Get("X-Forwarded-For"))
 	sEarliest := "2019-08-24"
 	sLatest := "2019-08-31"
 	earliest, eerr := time.Parse(IsoLayout, sEarliest)
@@ -48,7 +68,7 @@ func (s Server) Handler(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
-		s.Cache.Set("t", userEnergy, time.Second * 5)
+		s.Cache.Set("t", userEnergy, time.Minute * 1)
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Header().Add("Content-Type", "plain/text")
