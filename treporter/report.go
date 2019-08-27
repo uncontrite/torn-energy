@@ -13,6 +13,48 @@ type Args struct {
 	RethinkdbServer string
 }
 
+type UserEnergy struct {
+	User uint
+	Energy int
+}
+
+type Reporter struct {
+	UserDao *rethinkdb.UserDao
+}
+
+func (r Reporter) CalculateEnergyTrained(earliest time.Time, latest time.Time) ([]UserEnergy, error) {
+	energyTrainedPerUser := make(map[uint]int)
+	start := time.Now()
+	userIds, err := r.UserDao.GetUserIds()
+	elapsed := time.Since(start)
+	log.Printf("GetUserIds took: %s\n", elapsed)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Found %d distinct User IDs: %v energyTrained", len(userIds), userIds)
+	for _, userId := range userIds {
+		log.Printf("Consuming UserId: %d", userId)
+		userData, err := r.UserDao.GetInRange(userId, earliest, latest)
+		if err != nil {
+			log.Printf("ERR: Unable to get history for User: id=%d, err=%s\n", userId, err)
+		}
+		for i := 0; i < len(userData)-1; i++ {
+			prev := userData[i]
+			next := userData[i+1]
+			eTrained := model.CalculateEnergyTrained(prev.Document, next.Document)
+			energyTrainedPerUser[prev.Document.UserId] += eTrained
+		}
+	}
+	var userEnergy []UserEnergy
+	for userId, energyTrained := range energyTrainedPerUser {
+		userEnergy = append(userEnergy, UserEnergy{userId, energyTrained})
+	}
+	sort.SliceStable(userEnergy, func(i, j int) bool {
+		return userEnergy[i].Energy > userEnergy[j].Energy
+	})
+	return userEnergy, nil
+}
+
 func RunReport(args Args, done chan bool) {
 	// Basic data setup
 	isoLayout := "2006-01-02"
@@ -28,7 +70,7 @@ func RunReport(args Args, done chan bool) {
 	// DI setup
 	session := rethinkdb.SetUpDb(args.RethinkdbServer)
 	defer session.Close()
-	userDao := rethinkdb.RethinkdbUserDao{session}
+	userDao := rethinkdb.UserDao{session}
 
 	energyTrainedPerUser := make(map[uint]int)
 	go func() {

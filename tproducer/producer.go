@@ -8,7 +8,7 @@ import (
 	"os"
 	"strconv"
 	"time"
-	"torn/http"
+	"torn/thttp"
 )
 
 type Args struct {
@@ -76,7 +76,7 @@ func RunProducer(bootstrapServer string, apiKeys []string, done chan bool) {
 	for _, apiKey := range apiKeys {
 		trackerUsers = append(trackerUsers, TrackerUser{apiKey, time.Second * 5})
 	}
-	var tornClient = http.NewTornClient()
+	var tornClient = thttp.NewTornClient()
 	var cache = gcache.New(gcache.NoExpiration, gcache.NoExpiration)
 	producer := SetUpProducer(bootstrapServer)
 	defer producer.Close()
@@ -92,7 +92,7 @@ func RunProducer(bootstrapServer string, apiKeys []string, done chan bool) {
 				log.Printf("Job started: %s at %s\n", truncatedApiKey, t)
 				userId, err := UpdateUser(tornClient, cache, producer, tu.TornApiKey)
 				if err != nil {
-					if errExt, ok := err.(*http.TornErrorExt); ok {
+					if errExt, ok := err.(*thttp.TornErrorExt); ok {
 						if errExt.Remove {
 							log.Printf("Job failed permanently: error=%s, key=%s\n", errExt.Text, truncatedApiKey)
 							ticker.Stop()
@@ -123,7 +123,7 @@ type TrackerUser struct {
 	Frequency time.Duration `json:"frequency,omitempty"`
 }
 
-func UpdateUser(tornClient *http.TornClient, cache *gcache.Cache, producer *kafka.Producer, TornApiKey string) (userId *uint, err error) {
+func UpdateUser(tornClient *thttp.TornClient, cache *gcache.Cache, producer *kafka.Producer, TornApiKey string) (userId *uint, err error) {
 	// Get User
 	user, tornError, err := tornClient.GetUser(TornApiKey)
 	if err != nil {

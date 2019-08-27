@@ -16,17 +16,11 @@ type RethinkTornUser struct {
 	Document  model.User `r:"document,omitempty"`
 }
 
-type UserDao interface {
-	Exists(id int64) (bool, error)
-	Insert(user RethinkTornUser) error
-	GetInRange(id int64, earliest time.Time, latest time.Time) ([]RethinkTornUser, error)
-}
-
-type RethinkdbUserDao struct {
+type UserDao struct {
 	Session *r.Session
 }
 
-func (dao RethinkdbUserDao) GetUserIds() ([]int64, error) {
+func (dao UserDao) GetUserIds() ([]int64, error) {
 	m := make(map[string]string)
 	m["document"] = "userId"
 	cursor, err := r.DB("TornEnergy").Table("User").
@@ -42,7 +36,7 @@ func (dao RethinkdbUserDao) GetUserIds() ([]int64, error) {
 	return rows, nil
 }
 
-func (dao RethinkdbUserDao) GetInRange(id int64, earliest time.Time, latest time.Time) ([]RethinkTornUser, error) {
+func (dao UserDao) GetInRange(id int64, earliest time.Time, latest time.Time) ([]RethinkTornUser, error) {
 	cursor, err := r.DB("TornEnergy").Table("User").
 		Between([]interface{}{id, earliest}, []interface{}{id, latest}, r.BetweenOpts{LeftBound: "closed", RightBound: "closed", Index: "userIdTimestamp"}).
 		OrderBy(r.OrderByOpts{Index: "userIdTimestamp"}).
@@ -59,7 +53,7 @@ func (dao RethinkdbUserDao) GetInRange(id int64, earliest time.Time, latest time
 	return rows, nil
 }
 
-func (dao RethinkdbUserDao) Exists(id int64) (bool, error) {
+func (dao UserDao) Exists(id int64) (bool, error) {
 	// TODO: Replace with channel
 	cursor, err := r.DB("TornEnergy").Table("User").Get(id).
 		Field("id").
@@ -73,7 +67,7 @@ func (dao RethinkdbUserDao) Exists(id int64) (bool, error) {
 	return err != r.ErrEmptyResult, nil
 }
 
-func (dao RethinkdbUserDao) Insert(user RethinkTornUser) error {
+func (dao UserDao) Insert(user RethinkTornUser) error {
 	response, err := r.DB("TornEnergy").Table("User").
 		Insert(user).
 		RunWrite(dao.Session)
@@ -90,6 +84,8 @@ func SetUpDb(server string) *r.Session {
 	r.SetTags("r", "json")
 	session, err := r.Connect(r.ConnectOpts{
 		Address: server,
+		ReadTimeout: time.Second * 6,
+		WriteTimeout: time.Second * 30,
 	})
 	if err != nil {
 		log.Fatalln(err)

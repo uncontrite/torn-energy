@@ -1,4 +1,4 @@
-package http
+package thttp
 
 import (
 	"encoding/json"

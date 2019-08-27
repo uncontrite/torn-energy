@@ -1,11 +1,17 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"github.com/patrickmn/go-cache"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+	"torn/thttp"
+	"torn/rethinkdb"
 	"torn/tproducer"
 	"torn/tconsumer"
 	"torn/treporter"
@@ -27,6 +33,12 @@ type Args struct {
 	Consumer *tconsumer.Args
 	Producer *ProducerArgs
 	Report   *treporter.Args
+	Server   *ServerArgs
+}
+
+type ServerArgs struct {
+	RethinkdbServer string
+	Port string
 }
 
 type ProducerArgs struct {
@@ -40,10 +52,14 @@ func ParseCliArgs() Args {
 	var rethinkDbServer string
 	var consumer bool
 	var reporter bool
+	var server bool
+	var port string
 	flag.StringVar(&bootstrapServer, "bootstrap-server", "127.0.0.1", "Kafka bootstrap server")
 	flag.StringVar(&rethinkDbServer, "rethinkdb-server", "127.0.0.1", "RethinkDB server")
+	flag.StringVar(&port, "port", ":80", "Server port")
 	flag.BoolVar(&consumer, "consumer", false, "Runs app in consumer mode")
 	flag.BoolVar(&reporter, "reporter", false, "Runs app in reporter mode")
+	flag.BoolVar(&server, "server", false, "Runs app in server mode")
 	flag.Parse()
 	if consumer {
 		consumerArgs := tconsumer.Args{BootstrapServer: bootstrapServer, RethinkdbServer: rethinkDbServer}
@@ -51,6 +67,12 @@ func ParseCliArgs() Args {
 	} else if reporter {
 		args := treporter.Args{RethinkdbServer: rethinkDbServer}
 		return Args{Report: &args}
+	} else if server {
+		args := ServerArgs{
+			RethinkdbServer: rethinkDbServer,
+			Port:            port,
+		}
+		return Args{Server: &args}
 	}
 	// Producer mode
 	apiKeys := flag.Args()
@@ -86,6 +108,31 @@ func main() {
 	} else if args.Report != nil {
 		log.Println("Running in reporter mode.")
 		treporter.RunReport(*args.Report, intTermChan)
+	} else if args.Server != nil {
+		log.Println("Running in server mode.")
+		cash := cache.New(time.Second * 3, time.Second * 3)
+		session := rethinkdb.SetUpDb(args.Server.RethinkdbServer)
+		defer session.Close()
+		userDao := rethinkdb.UserDao{Session: session}
+		reporter := treporter.Reporter{UserDao: &userDao}
+		server := thttp.Server{Cache: cash, Reporter: &reporter}
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", server.Handler)
+		srv := &http.Server{Addr: args.Server.Port, Handler: mux}
+		go func() {
+			// returns ErrServerClosed on graceful close
+			if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+				// NOTE: there is a chance that next line won't have time to run,
+				// as main() doesn't wait for this goroutine to stop. don't use
+				// code with race conditions like these for production. see post
+				// comments below on more discussion on how to handle this.
+				log.Fatalf("ListenAndServe(): %s", err)
+			}
+		}()
+		<- intTermChan
+		if err := srv.Shutdown(context.TODO()); err != nil {
+			panic(err) // failure/timeout shutting down the server gracefully
+		}
 	} else {
 		log.Println("Invalid arguments provided")
 	}
