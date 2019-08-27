@@ -1,4 +1,4 @@
-package main
+package model
 
 type Energy struct {
 	Previous int `json:"previous,omitempty"`

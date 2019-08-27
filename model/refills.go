@@ -1,4 +1,4 @@
-package main
+package model
 
 type Refills struct {
 	EnergyRefillUsed bool `json:"energy_refill_used,omitempty"`

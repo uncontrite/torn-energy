@@ -1,4 +1,4 @@
-package main
+package http
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"time"
+	"torn/model"
 )
 
 const UserSelections = "bars,battlestats,jobpoints,personalstats,refills,basic"
@@ -71,7 +72,7 @@ func (ter *TornErrorResponse) GetError() *TornErrorExt {
 	}
 }
 
-func (tc TornClient) GetUser(apiKey string) (*User, *TornErrorResponse, error) {
+func (tc TornClient) GetUser(apiKey string) (*model.User, *TornErrorResponse, error) {
 	req, err := http.NewRequest(http.MethodGet, "https://api.torn.com/user", nil)
 	if err != nil {
 		return nil, nil, err
@@ -101,13 +102,13 @@ func (tc TornClient) GetUser(apiKey string) (*User, *TornErrorResponse, error) {
 		return nil, nil, err
 	}
 
-	responseType, err := GetUserResponseType(body)
+	responseType, err := model.GetUserResponseType(body)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	if *responseType == "Torn" || *responseType == "Kafka" {
-		user := User{}
+		user := model.User{}
 		err = json.Unmarshal(body, &user)
 		if err != nil {
 			return nil, nil, err

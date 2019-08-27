@@ -6,6 +6,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"torn/tproducer"
+	"torn/tconsumer"
+	"torn/treporter"
 )
 
 /*
@@ -21,23 +24,14 @@ Features:
 */
 
 type Args struct {
+	Consumer *tconsumer.Args
 	Producer *ProducerArgs
-	Consumer *ConsumerArgs
-	Report   *ReportArgs
-}
-
-type ConsumerArgs struct {
-	BootstrapServer string
-	RethinkdbServer string
+	Report   *treporter.Args
 }
 
 type ProducerArgs struct {
 	BootstrapServer string
 	ApiKeys []string
-}
-
-type ReportArgs struct {
-	RethinkdbServer string
 }
 
 func ParseCliArgs() Args {
@@ -52,10 +46,10 @@ func ParseCliArgs() Args {
 	flag.BoolVar(&reporter, "reporter", false, "Runs app in reporter mode")
 	flag.Parse()
 	if consumer {
-		consumerArgs := ConsumerArgs{BootstrapServer: bootstrapServer, RethinkdbServer: rethinkDbServer}
+		consumerArgs := tconsumer.Args{BootstrapServer: bootstrapServer, RethinkdbServer: rethinkDbServer}
 		return Args{Consumer: &consumerArgs}
 	} else if reporter {
-		args := ReportArgs{RethinkdbServer: rethinkDbServer}
+		args := treporter.Args{RethinkdbServer: rethinkDbServer}
 		return Args{Report: &args}
 	}
 	// Producer mode
@@ -85,13 +79,13 @@ func main() {
 	log.Println("Application initialised; awaiting termination signal.")
 	if args.Producer != nil {
 		log.Println("Running in producer mode.")
-		RunProducer(args.Producer.BootstrapServer, args.Producer.ApiKeys, intTermChan)
+		tproducer.RunProducer(args.Producer.BootstrapServer, args.Producer.ApiKeys, intTermChan)
 	} else if args.Consumer != nil {
 		log.Println("Running in consumer mode.")
-		RunConsumer(*args.Consumer, intTermChan)
+		tconsumer.RunConsumer(*args.Consumer, intTermChan)
 	} else if args.Report != nil {
-		log.Println("Running in report mode.")
-		RunReport(*args.Report, intTermChan)
+		log.Println("Running in reporter mode.")
+		treporter.RunReport(*args.Report, intTermChan)
 	} else {
 		log.Println("Invalid arguments provided")
 	}

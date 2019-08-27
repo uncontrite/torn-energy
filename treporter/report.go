@@ -1,13 +1,19 @@
-package main
+package treporter
 
 import (
 	"fmt"
 	"log"
 	"sort"
 	"time"
+	"torn/model"
+	"torn/rethinkdb"
 )
 
-func RunReport(args ReportArgs, done chan bool) {
+type Args struct {
+	RethinkdbServer string
+}
+
+func RunReport(args Args, done chan bool) {
 	// Basic data setup
 	isoLayout := "2006-01-02"
 	sEarliest := "2019-08-24"
@@ -20,9 +26,9 @@ func RunReport(args ReportArgs, done chan bool) {
 	}
 
 	// DI setup
-	session := SetUpDb(args.RethinkdbServer)
+	session := rethinkdb.SetUpDb(args.RethinkdbServer)
 	defer session.Close()
-	userDao := RethinkdbUserDao{session}
+	userDao := rethinkdb.RethinkdbUserDao{session}
 
 	energyTrainedPerUser := make(map[uint]int)
 	go func() {
@@ -41,7 +47,7 @@ func RunReport(args ReportArgs, done chan bool) {
 			for i := 0; i < len(userData) - 1; i++ {
 				prev := userData[i]
 				next := userData[i+1]
-				eTrained := CalculateEnergyTrained(prev.Document, next.Document)
+				eTrained := model.CalculateEnergyTrained(prev.Document, next.Document)
 				energyTrainedPerUser[prev.Document.UserId] += eTrained
 				//diff := prev.Document.Diff(next.Document)
 				//_, cats := diff.IsDiffRelevant()

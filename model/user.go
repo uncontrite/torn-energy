@@ -1,4 +1,4 @@
-package main
+package model
 
 import (
 	"encoding/json"
@@ -14,24 +14,24 @@ type RawUser struct {
 
 	// Bars
 	Energy Energy `json:"energy,omitempty"`
-	Happy Happy `json:"happy,omitempty"`
+	Happy  Happy  `json:"happy,omitempty"`
 
 	// Fields
 	PlayerId uint `json:"player_id,omitempty"`
 
 	// Well-structured crap
-	JobPoints RawJobPoints `json:"jobpoints,omitempty"`
+	JobPoints     RawJobPoints  `json:"jobpoints,omitempty"`
 	PersonalStats PersonalStats `json:"personalstats,omitempty"`
-	Refills Refills `json:"refills,omitempty"`
+	Refills       Refills       `json:"refills,omitempty"`
 }
 
 type User struct {
-	UserId uint `json:"userId,omitempty"`
-	BattleStats BattleStats `json:"battlestats,omitempty"`
-	Bars Bars `json:"bars,omitempty"`
-	Jobs []Job `json:"jobs,omitempty"`
+	UserId        uint          `json:"userId,omitempty"`
+	BattleStats   BattleStats   `json:"battlestats,omitempty"`
+	Bars          Bars          `json:"bars,omitempty"`
+	Jobs          []Job         `json:"jobs,omitempty"`
 	PersonalStats PersonalStats `json:"personalstats,omitempty"`
-	Refills Refills `json:"refills,omitempty"`
+	Refills       Refills       `json:"refills,omitempty"`
 }
 
 func (u User) Equals(other interface{}) bool {

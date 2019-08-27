@@ -1,4 +1,4 @@
-package main
+package model
 
 import (
 	"encoding/json"
@@ -164,8 +164,6 @@ const DIFF = `{
     }
   },
   "battlestats": {
-    "defense": "0.0000",
-    "dexterity": "0.0000",
     "speed": "33602195.8422",
     "strength": "1042501.2602"
   },
@@ -214,9 +212,9 @@ func TestSub(t *testing.T) {
 		args args
 		want string
 	}{
-		{"Basic",args{"2", "1"}, "1"},
-		{"Negative Outcome",args{"2", "3"}, "-1"},
-		{"Float",args{"391103118.8087", "383085829.4637"}, "8017289.345"},
+		{"Basic",args{"2", "1"}, "1.0000"},
+		{"Negative Outcome",args{"2", "3"}, "-1.0000"},
+		{"Float",args{"391103118.8087", "383085829.4637"}, "8017289.3450"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

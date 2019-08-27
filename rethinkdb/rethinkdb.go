@@ -1,4 +1,4 @@
-package main
+package rethinkdb
 
 import (
 	"errors"
@@ -6,13 +6,14 @@ import (
 	r "gopkg.in/rethinkdb/rethinkdb-go.v5"
 	"log"
 	"time"
+	"torn/model"
 )
 
 type RethinkTornUser struct {
-	Id int64 `r:"id"`
-	Offset int64 `r:"offset"`
-	Timestamp time.Time `r:"timestamp,omitempty"`
-	Document User `r:"document,omitempty"`
+	Id        int64      `r:"id"`
+	Offset    int64      `r:"offset"`
+	Timestamp time.Time  `r:"timestamp,omitempty"`
+	Document  model.User `r:"document,omitempty"`
 }
 
 type UserDao interface {

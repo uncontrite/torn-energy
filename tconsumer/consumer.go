@@ -1,4 +1,4 @@
-package main
+package tconsumer
 
 import (
 	"encoding/json"
@@ -8,17 +8,24 @@ import (
 	"os"
 	"sync/atomic"
 	"time"
+	"torn/model"
+	"torn/rethinkdb"
 )
+
+type Args struct {
+	BootstrapServer string
+	RethinkdbServer string
+}
 
 func SetUpConsumer(bootstrapServer string) (*kafka.Consumer, func()) {
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": bootstrapServer,
-		"group.id" : "rethinkdb-consumer",
+		"group.id" : "rethinkdb-tconsumer",
 		"auto.offset.reset": "earliest",
 		"enable.auto.commit": "false",
 	})
 	if err != nil {
-		log.Printf("Failed to create consumer: %s\n", err)
+		log.Printf("Failed to create tconsumer: %s\n", err)
 		os.Exit(1)
 	}
 	err = consumer.SubscribeTopics([]string{"TornEnergy"}, nil)
@@ -29,7 +36,7 @@ func SetUpConsumer(bootstrapServer string) (*kafka.Consumer, func()) {
 	return consumer, func() {
 		err := consumer.Close()
 		if err != nil {
-			log.Printf("Unable to close consumer: %s\n", err)
+			log.Printf("Unable to close tconsumer: %s\n", err)
 		}
 	}
 }
@@ -53,13 +60,13 @@ func CountingConsumer(consumer *kafka.Consumer) {
 	}()
 }
 
-func ToRethinkTornUser(msg *kafka.Message) (*RethinkTornUser, error) {
-	var tUser User
+func ToRethinkTornUser(msg *kafka.Message) (*rethinkdb.RethinkTornUser, error) {
+	var tUser model.User
 	err := json.Unmarshal(msg.Value, &tUser)
 	if err != nil {
 		return nil, err
 	}
-	return &RethinkTornUser{
+	return &rethinkdb.RethinkTornUser{
 		Id: int64(msg.TopicPartition.Offset),
 		Offset: int64(msg.TopicPartition.Offset),
 		Timestamp: msg.Timestamp,
@@ -67,7 +74,7 @@ func ToRethinkTornUser(msg *kafka.Message) (*RethinkTornUser, error) {
 	}, nil
 }
 
-func RethinkdbStoringConsumer(consumer *kafka.Consumer, userDao UserDao) {
+func RethinkdbStoringConsumer(consumer *kafka.Consumer, userDao rethinkdb.UserDao) {
 	var kerrs uint64
 	go func() {
 		for {
@@ -104,11 +111,11 @@ func RethinkdbStoringConsumer(consumer *kafka.Consumer, userDao UserDao) {
 	}()
 }
 
-func RunConsumer(args ConsumerArgs, done chan bool) {
+func RunConsumer(args Args, done chan bool) {
 	consumer, closer := SetUpConsumer(args.BootstrapServer)
 	defer closer()
-	session := SetUpDb(args.RethinkdbServer)
-	userDao := RethinkdbUserDao{Session: session}
+	session := rethinkdb.SetUpDb(args.RethinkdbServer)
+	userDao := rethinkdb.RethinkdbUserDao{Session: session}
 	RethinkdbStoringConsumer(consumer, userDao)
 	<-done
 	partitions, err := consumer.Commit()

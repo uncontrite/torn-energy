@@ -1,6 +1,8 @@
-package main
+package model
 
-import "sort"
+import (
+	"sort"
+)
 
 func (u User) Diff(u2 User) User {
 	var diff User

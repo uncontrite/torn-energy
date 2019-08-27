@@ -1,4 +1,4 @@
-package main
+package model
 
 type PersonalStats struct {
 	AttacksWon int `json:"attackswon,omitempty"`
