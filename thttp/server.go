@@ -22,15 +22,17 @@ func (s Server) RefreshCachePeriodically() {
 	earliest, _ := time.Parse(IsoLayout, DefaultEarliest)
 	latest, _ := time.Parse(IsoLayout, DefaultLatest)
 	go func() {
-		log.Println("Starting ET cache update")
-		userEnergy, err := s.Reporter.CalculateEnergyTrained(earliest, latest)
-		if err != nil {
-			log.Printf("ERR: Unable to refresh cache on interval: %v", err)
-			time.Sleep(time.Second * 10)
-		} else {
-			log.Println("Successfully updated ET cache")
-			s.Cache.Set("t", userEnergy, time.Minute * 1)
-			time.Sleep(time.Second * 30)
+		for {
+			log.Println("Starting ET cache update")
+			userEnergy, err := s.Reporter.CalculateEnergyTrained(earliest, latest)
+			if err != nil {
+				log.Printf("ERR: Unable to refresh cache on interval: %v", err)
+				time.Sleep(time.Second * 5)
+			} else {
+				log.Println("Successfully updated ET cache")
+				s.Cache.Set("t", userEnergy, time.Second * 30)
+				time.Sleep(time.Second * 15)
+			}
 		}
 	}()
 }
@@ -72,8 +74,8 @@ func (s Server) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Header().Add("Content-Type", "plain/text")
-	for _, ue := range userEnergy {
-		_, err := w.Write([]byte(fmt.Sprintf("User [%d] has trained [%d] energy at the gym.\n", ue.User, ue.Energy)))
+	for rank, ue := range userEnergy {
+		_, err := w.Write([]byte(fmt.Sprintf("#%d [%d (%s): %d trained\n", rank+1, ue.User, ue.Name, ue.Energy)))
 		if err != nil {
 			log.Printf("ERR: Unable to write UserEnergy to response: %v", err)
 		}
