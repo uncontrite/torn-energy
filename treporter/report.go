@@ -14,6 +14,7 @@ type Args struct {
 
 type UserEnergy struct {
 	User uint
+	Name string
 	Energy int
 }
 
@@ -23,6 +24,7 @@ type Reporter struct {
 
 func (r Reporter) CalculateEnergyTrained(earliest time.Time, latest time.Time) ([]UserEnergy, error) {
 	energyTrainedPerUser := make(map[uint]int)
+	nameByUserId := make(map[uint]string)
 	start := time.Now()
 	userIds, err := r.UserDao.GetUserIds()
 	elapsed := time.Since(start)
@@ -43,10 +45,18 @@ func (r Reporter) CalculateEnergyTrained(earliest time.Time, latest time.Time) (
 			eTrained := udiff.CalculateEnergyTrained()
 			energyTrainedPerUser[prev.Document.UserId] += eTrained
 		}
+		for i := len(userData)-1; i >= 0; i-- {
+			cur := userData[i]
+			if cur.Document.Name != "" {
+				nameByUserId[cur.Document.UserId] = cur.Document.Name
+				break
+			}
+		}
 	}
 	var userEnergy []UserEnergy
 	for userId, energyTrained := range energyTrainedPerUser {
-		userEnergy = append(userEnergy, UserEnergy{userId, energyTrained})
+		name, _ := nameByUserId[userId]
+		userEnergy = append(userEnergy, UserEnergy{userId, name, energyTrained})
 	}
 	sort.SliceStable(userEnergy, func(i, j int) bool {
 		return userEnergy[i].Energy > userEnergy[j].Energy

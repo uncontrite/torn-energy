@@ -74,8 +74,8 @@ func (s Server) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Header().Add("Content-Type", "plain/text")
-	for _, ue := range userEnergy {
-		_, err := w.Write([]byte(fmt.Sprintf("User [%d] has trained [%d] energy at the gym.\n", ue.User, ue.Energy)))
+	for rank, ue := range userEnergy {
+		_, err := w.Write([]byte(fmt.Sprintf("#%d [%d (%s): %d trained\n", rank+1, ue.User, ue.Name, ue.Energy)))
 		if err != nil {
 			log.Printf("ERR: Unable to write UserEnergy to response: %v", err)
 		}
