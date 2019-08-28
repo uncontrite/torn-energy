@@ -17,6 +17,7 @@ type RawUser struct {
 	Happy  Happy  `json:"happy,omitempty"`
 
 	// Fields
+	Name string `json:"name,omitempty"`
 	PlayerId uint `json:"player_id,omitempty"`
 
 	// Well-structured crap
@@ -27,6 +28,7 @@ type RawUser struct {
 
 type User struct {
 	UserId        uint          `json:"userId,omitempty"`
+	Name	      string        `json:"name,omitempty"`
 	BattleStats   BattleStats   `json:"battlestats,omitempty"`
 	Bars          Bars          `json:"bars,omitempty"`
 	Jobs          []Job         `json:"jobs,omitempty"`
@@ -59,7 +61,7 @@ func (raw RawUser) User() (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &User{raw.PlayerId, raw.BattleStats(), raw.Bars(), jobs, raw.PersonalStats, raw.Refills}, nil
+	return &User{raw.PlayerId, raw.Name, raw.BattleStats(), raw.Bars(), jobs, raw.PersonalStats, raw.Refills}, nil
 }
 
 func (u User) MarshalJson() ([]byte, error) {

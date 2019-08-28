@@ -22,15 +22,17 @@ func (s Server) RefreshCachePeriodically() {
 	earliest, _ := time.Parse(IsoLayout, DefaultEarliest)
 	latest, _ := time.Parse(IsoLayout, DefaultLatest)
 	go func() {
-		log.Println("Starting ET cache update")
-		userEnergy, err := s.Reporter.CalculateEnergyTrained(earliest, latest)
-		if err != nil {
-			log.Printf("ERR: Unable to refresh cache on interval: %v", err)
-			time.Sleep(time.Second * 10)
-		} else {
-			log.Println("Successfully updated ET cache")
-			s.Cache.Set("t", userEnergy, time.Minute * 1)
-			time.Sleep(time.Second * 30)
+		for {
+			log.Println("Starting ET cache update")
+			userEnergy, err := s.Reporter.CalculateEnergyTrained(earliest, latest)
+			if err != nil {
+				log.Printf("ERR: Unable to refresh cache on interval: %v", err)
+				time.Sleep(time.Second * 5)
+			} else {
+				log.Println("Successfully updated ET cache")
+				s.Cache.Set("t", userEnergy, time.Second * 30)
+				time.Sleep(time.Second * 15)
+			}
 		}
 	}()
 }
