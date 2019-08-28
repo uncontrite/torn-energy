@@ -54,6 +54,40 @@ func (ps PersonalStats) IsDiffAttack() bool {
 	return ps.AttacksWon > 0 || ps.AttacksLost > 0 || ps.AttacksDraw > 0 || ps.AttacksAssisted > 0 || ps.YouRunAway > 0
 }
 
+func (ps PersonalStats) GetEvents() []string {
+	var events []string
+	if ps.IsDiffAttack() {
+		events = append(events, "wasted 25e by attacking someone")
+	}
+	if ps.DumpSearches > 0 {
+		events = append(events, "wasted 5e by searching the dump")
+	}
+	if ps.LsdTaken > 0 {
+		events = append(events, "gained 50e by taking LSD")
+	}
+	if ps.XanaxTaken > 0 {
+		events = append(events, "gained 250e by taking Xanax")
+	}
+	if ps.Overdosed > 0 {
+		events = append(events, "overdosed, RIP")
+	}
+	if ps.Refills > 0 {
+		events = append(events, "gained 150e* by using a point refill")
+	}
+	if ps.BooksRead > 0 {
+		events = append(events, "read a book")
+	}
+	if ps.EnergyDrinkUsed > 0 {
+		events = append(events, "gained 30e* by consuming an energy drink")
+	}
+	// Booster can be FHC or EDVD; can guesstimate based on User data; determine at that level
+	// if ps.BoostersUsed > 0 {}
+	if ps.ConsumablesUsed > 0 {
+		events = append(events, "ate ass")
+	}
+	return events
+}
+
 func (ps PersonalStats) IsDiffRelevant() []string {
 	var reasons []string
 	if ps.IsDiffAttack() {

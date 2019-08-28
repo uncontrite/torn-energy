@@ -1,6 +1,8 @@
 package model
 
-import "math/big"
+import (
+	"math/big"
+)
 
 type BattleStats struct {
 	Strength string `json:"strength,omitempty"`
@@ -31,6 +33,19 @@ func (bs BattleStats) IsTrain() bool {
 	dex := ToFloat(bs.Dexterity)
 	spd := ToFloat(bs.Speed)
 	return str.Cmp(zero) > 0 || def.Cmp(zero) > 0 || dex.Cmp(zero) > 0 || spd.Cmp(zero) > 0
+}
+
+func (bs BattleStats) GetTotalGains() *big.Float {
+	str := ToFloat(bs.Strength)
+	def := ToFloat(bs.Defense)
+	dex := ToFloat(bs.Dexterity)
+	spd := ToFloat(bs.Speed)
+	sum, _ := new(big.Float).SetPrec(prec).SetString("0")
+	sum = sum.Add(sum, str)
+	sum = sum.Add(sum, def)
+	sum = sum.Add(sum, dex)
+	sum = sum.Add(sum, spd)
+	return sum
 }
 
 func ToFloat(value string) *big.Float {
