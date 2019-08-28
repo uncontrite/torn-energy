@@ -5,7 +5,6 @@ import (
 	"log"
 	"sort"
 	"time"
-	"torn/model"
 	"torn/rethinkdb"
 )
 
@@ -40,7 +39,8 @@ func (r Reporter) CalculateEnergyTrained(earliest time.Time, latest time.Time) (
 		for i := 0; i < len(userData)-1; i++ {
 			prev := userData[i]
 			next := userData[i+1]
-			eTrained := model.CalculateEnergyTrained(prev.Document, next.Document)
+			udiff := prev.Document.Diff(next.Document)
+			eTrained := udiff.CalculateEnergyTrained()
 			energyTrainedPerUser[prev.Document.UserId] += eTrained
 		}
 	}
@@ -52,6 +52,22 @@ func (r Reporter) CalculateEnergyTrained(earliest time.Time, latest time.Time) (
 		return userEnergy[i].Energy > userEnergy[j].Energy
 	})
 	return userEnergy, nil
+}
+
+type KV struct {
+	Key uint
+	Value int
+}
+
+func SortMapByValue(m map[uint]int) []KV {
+	var sorted []KV
+	for k, v := range m {
+		sorted = append(sorted, KV{k, v})
+	}
+	sort.SliceStable(sorted, func(i, j int) bool {
+		return sorted[i].Value > sorted[j].Value
+	})
+	return sorted
 }
 
 func RunReport(args Args, done chan bool) {
@@ -88,14 +104,9 @@ func RunReport(args Args, done chan bool) {
 			for i := 0; i < len(userData) - 1; i++ {
 				prev := userData[i]
 				next := userData[i+1]
-				eTrained := model.CalculateEnergyTrained(prev.Document, next.Document)
+				udiff := prev.Document.Diff(next.Document)
+				eTrained := udiff.CalculateEnergyTrained()
 				energyTrainedPerUser[prev.Document.UserId] += eTrained
-				//diff := prev.Document.Diff(next.Document)
-				//_, cats := diff.IsDiffRelevant()
-				//if _, jp := cats["jp"]; jp && eTrained > 0 {
-				//	pp, _ := json.MarshalIndent(diff, "", "  ")
-				//	log.Println(string(pp))
-				//}
 			}
 		}
 		done <- true
@@ -103,18 +114,7 @@ func RunReport(args Args, done chan bool) {
 
 	<- done
 
-	type kv struct {
-		Key uint
-		Value int
-	}
-	var sorted []kv
-	for k, v := range energyTrainedPerUser {
-		sorted = append(sorted, kv{k, v})
-	}
-	sort.SliceStable(sorted, func(i, j int) bool {
-		return sorted[i].Value > sorted[j].Value
-	})
-
+	sorted := SortMapByValue(energyTrainedPerUser)
 	for _, v := range sorted {
 		fmt.Printf("%d: %d energy trained\n", v.Key, v.Value)
 	}

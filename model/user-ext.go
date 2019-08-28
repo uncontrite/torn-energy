@@ -1,21 +1,28 @@
 package model
 
 import (
+	"fmt"
 	"sort"
 )
 
-func (u User) Diff(u2 User) User {
-	var diff User
+type UserDiff struct {
+	User
+	MaxEnergy int `json:"maxEnergy,omitempty"`
+}
+
+func (u User) Diff(u2 User) UserDiff {
+	var diff UserDiff
 	diff.BattleStats = u.BattleStats.Diff(u2.BattleStats)
 	diff.Bars = u.Bars.Diff(u2.Bars)
 	diff.PersonalStats = u.PersonalStats.Diff(u2.PersonalStats)
 	diff.Jobs = Diff(u2.Jobs, u.Jobs)
 	diff.Refills = u.Refills.Diff(u2.Refills)
 	diff.UserId = u.UserId
+	diff.MaxEnergy = u.Bars.Energy.Maximum
 	return diff
 }
 
-func (u User) IsDiffRelevant() ([]string, map[string]struct{}) {
+func (u UserDiff) IsRelevant() ([]string, map[string]struct{}) {
 	var reasons []string
 	if u.IsTrain() {
 		reasons = append(reasons, "train")
@@ -40,7 +47,30 @@ func (u User) IsDiffRelevant() ([]string, map[string]struct{}) {
 	return reasons, m
 }
 
-func (u User) IsTrain() bool {
+func (u UserDiff) GetEvents() []string {
+	var events []string
+	if psEvents := u.PersonalStats.GetEvents(); len(psEvents) > 0 {
+		events = append(events, psEvents...)
+	}
+	if jpEnergyGained, jpSpent := u.CalculateEnergyGainedFromJobPoints(); jpEnergyGained > 0 {
+		events = append(events, fmt.Sprintf("gained %de by spending %d job points", jpEnergyGained, jpSpent))
+	}
+	fhc, edvd := CalculateBoosterSplit(u.Bars.Happy.Previous, u.Bars.Happy.Current, u.PersonalStats.EcstasyTaken, u.PersonalStats.BoostersUsed)
+	if fhc > 0 {
+		events = append(events, fmt.Sprintf("gained %de* by using %d FHCs", 150 * fhc, fhc))
+	}
+	if edvd > 0 {
+		events = append(events, fmt.Sprintf("gained %d happy by watching %d eDVDs", edvd * 2500, edvd))
+	}
+	gains := u.BattleStats.GetTotalGains()
+	trained := u.CalculateEnergyTrained()
+	if t, _ := gains.Float64(); t > 0 || trained > 0 {
+		events = append(events, fmt.Sprintf("trained %de gaining %s stats", trained, gains.Text('f', 4)))
+	}
+	return events
+}
+
+func (u UserDiff) IsTrain() bool {
 	return u.BattleStats.IsTrain()
 }
 
@@ -66,27 +96,9 @@ func CalculateBoosterSplit(prevHappy int, currHappy int, ecstasyTaken int, boost
 	return fhc, edvd
 }
 
-func CalculateEnergyTrained(prev User, curr User) int {
-	diff := prev.Diff(curr)
-	if !diff.IsTrain() {
-		return 0
-	}
-	prfEnergy := diff.PersonalStats.Refills * prev.Bars.Energy.Maximum
-	xanEnergy := 250 * diff.PersonalStats.XanaxTaken
-	lsdEnergy := 50 * diff.PersonalStats.LsdTaken
-	ps := diff.PersonalStats
-	attacks := ps.AttacksWon + ps.AttacksLost + ps.AttacksDraw + ps.AttacksAssisted + ps.YouRunAway
-	attacksEnergy := -25 * attacks
-	unspentEnergy := -1 * curr.Bars.Energy.Current
-	dumpEnergy := -5 * ps.DumpSearches
-	energyDrinkEnergy := 30 * ps.EnergyDrinkUsed
-	// Heuristic to split Booster into FHC v. EDVD
-	fhc, _ := CalculateBoosterSplit(prev.Bars.Happy.Current, curr.Bars.Happy.Current, diff.PersonalStats.EcstasyTaken,
-		diff.PersonalStats.BoostersUsed)
-	fhcEnergy := 150 * fhc
-
+func (u UserDiff) CalculateEnergyGainedFromJobPoints() (int, int) {
 	var gameShop, candle, farm, furniture, pub, restaurant int
-	for _, j := range diff.Jobs {
+	for _, j := range u.Jobs {
 		if j.Points > 0 {
 			continue
 		}
@@ -104,8 +116,31 @@ func CalculateEnergyTrained(prev User, curr User) int {
 			restaurant = -1 * j.Points
 		}
 	}
+	pointsSpent := gameShop + candle + farm + furniture + pub + restaurant
 	jobEnergy := (5 * gameShop) + (5 * candle) + (7 * farm) + (3 * furniture) + (3 * pub) + (3 * restaurant)
-	eTrained := prev.Bars.Energy.Current + prfEnergy + xanEnergy + lsdEnergy + unspentEnergy + attacksEnergy +
-		dumpEnergy + energyDrinkEnergy + fhcEnergy + jobEnergy
+	return jobEnergy, pointsSpent
+}
+
+func (u UserDiff) CalculateEnergyTrained() int {
+	if !u.IsTrain() {
+		return 0
+	}
+	prfEnergy := u.PersonalStats.Refills * u.MaxEnergy
+	xanEnergy := 250 * u.PersonalStats.XanaxTaken
+	lsdEnergy := 50 * u.PersonalStats.LsdTaken
+	ps := u.PersonalStats
+	attacks := ps.AttacksWon + ps.AttacksLost + ps.AttacksDraw + ps.AttacksAssisted + ps.YouRunAway
+	attacksEnergy := -25 * attacks
+	dumpEnergy := -5 * ps.DumpSearches
+	energyDrinkEnergy := 30 * ps.EnergyDrinkUsed
+	// Heuristic to split Booster into FHC v. EDVD
+	fhc, _ := CalculateBoosterSplit(u.Bars.Happy.Previous, u.Bars.Happy.Current, u.PersonalStats.EcstasyTaken,
+		u.PersonalStats.BoostersUsed)
+	fhcEnergy := 150 * fhc
+
+	unspentEnergy := -1 * u.Bars.Energy.Current
+	jpEnergy, _ := u.CalculateEnergyGainedFromJobPoints()
+	eTrained := u.Bars.Energy.Previous + prfEnergy + xanEnergy + lsdEnergy + unspentEnergy + attacksEnergy +
+		dumpEnergy + energyDrinkEnergy + fhcEnergy + jpEnergy
 	return eTrained
 }
