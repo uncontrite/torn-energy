@@ -38,7 +38,7 @@ func (dao UserDao) GetUserIds() ([]int64, error) {
 
 func (dao UserDao) GetInRange(id int64, earliest time.Time, latest time.Time) ([]RethinkTornUser, error) {
 	cursor, err := r.DB("TornEnergy").Table("User").
-		Between([]interface{}{id, earliest}, []interface{}{id, latest}, r.BetweenOpts{LeftBound: "closed", RightBound: "closed", Index: "userIdTimestamp"}).
+		Between([]interface{}{id, earliest}, []interface{}{id, latest}, r.BetweenOpts{LeftBound: "closed", RightBound: "open", Index: "userIdTimestamp"}).
 		OrderBy(r.OrderByOpts{Index: "userIdTimestamp"}).
 		Run(dao.Session)
 	if err != nil {
