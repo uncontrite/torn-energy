@@ -46,25 +46,6 @@ func SetUpConsumer(bootstrapServer string, groupId string) (*kafka.Consumer, fun
 	}
 }
 
-func CountingConsumer(consumer *kafka.Consumer) {
-	var c uint64
-	go func() {
-		for {
-			msg, err := consumer.ReadMessage(time.Second * 5)
-			if err == nil {
-				//fmt.Printf("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
-				atomic.AddUint64(&c, 1)
-				if c % 100 == 0 {
-					log.Printf("Processed: %d records\n", c)
-				}
-			} else {
-				// The client will automatically try to recover from all errors.
-				fmt.Printf("Consumer error: %v (%v)\n", err, msg)
-			}
-		}
-	}()
-}
-
 func ToRethinkTornUser(msg *kafka.Message) (*rethinkdb.RethinkTornUser, error) {
 	var tUser model.User
 	err := json.Unmarshal(msg.Value, &tUser)
@@ -142,7 +123,7 @@ type UserPair struct {
 
 // WIP
 func RunConsumerV3(args Args, done chan bool) {
-	consumer, closer := SetUpConsumer(args.BootstrapServer, GroupIdV1)
+	consumer, closer := SetUpConsumer(args.BootstrapServer, GroupIdV3)
 	defer closer()
 	//session := rethinkdb.SetUpDb(args.RethinkdbServer)
 	//userDao := rethinkdb.UserDao{Session: session}
@@ -164,6 +145,7 @@ func RunConsumerV3(args Args, done chan bool) {
 
 	// Adapt Kafka Message to User
 	users := make(chan *rethinkdb.RethinkTornUser, 4)
+	min := time.Date(2019, time.August, 24, 0, 0, 0, 0, time.UTC)
 	go func() {
 		for {
 			//log.Println("Converting message to User")
@@ -173,6 +155,12 @@ func RunConsumerV3(args Args, done chan bool) {
 				log.Printf("ERR: Unable to convert Kafka message to Rethink model: offset=%d, err=%s\n", msg.TopicPartition.Offset, err)
 				continue
 			}
+			// TODO: Remove filtering
+			if dbUser.Timestamp.Before(min) {
+				continue
+			}
+			s, _ := json.Marshal(dbUser)
+			log.Printf("Event: %s\n", s)
 			users <- dbUser
 		}
 	}()
@@ -196,14 +184,10 @@ func RunConsumerV3(args Args, done chan bool) {
 	var pc int64
 	usertrained := make(map[uint]int)
 	var mux sync.Mutex
-	min := time.Date(2019, time.August, 24, 0, 0, 0, 0, time.UTC)
 	go func() {
 		for {
 			atomic.AddInt64(&pc, 1)
 			pair := <-pairs
-			if pair.Prev.Timestamp.Before(min) {
-				continue
-			}
 			if pair.Curr != nil {
 				udiff := pair.Prev.Document.Diff(pair.Curr.Document)
 				diff, _ := json.Marshal(udiff)
@@ -212,7 +196,7 @@ func RunConsumerV3(args Args, done chan bool) {
 				if trained > 0 || len(events) > 0 {
 					log.Printf("Diff (id=%d): %s (t=%d) (e=%d)\n", pair.Prev.Document.UserId, diff, trained, len(events))
 					for _, e := range events {
-						log.Printf("  %s\n", e)
+						log.Printf("  %s (b=%s, a=%s)\n", e, pair.Prev.Timestamp, pair.Curr.Timestamp)
 					}
 				}
 				mux.Lock()

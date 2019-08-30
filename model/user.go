@@ -42,7 +42,7 @@ func (u User) Equals(other interface{}) bool {
 	}
 	return u.UserId == other.(User).UserId &&
 		u.BattleStats == other.(User).BattleStats &&
-		u.Bars == other.(User).Bars &&
+		u.Bars.Equals(other.(User).Bars) &&
 		Eq(u.Jobs, other.(User).Jobs) &&
 		u.PersonalStats == other.(User).PersonalStats &&
 		u.Refills == other.(User).Refills
