@@ -32,7 +32,7 @@ func (r Reporter) CalculateEnergyTrained(earliest time.Time, latest time.Time) (
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Found %d distinct User IDs: %v energyTrained", len(userIds), userIds)
+	log.Printf("Found %d distinct User IDs: %v", len(userIds), userIds)
 	for _, userId := range userIds {
 		userData, err := r.UserDao.GetInRange(userId, earliest, latest)
 		if err != nil {

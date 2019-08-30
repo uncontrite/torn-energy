@@ -1,6 +1,7 @@
 package thttp
 
 import (
+	"errors"
 	"fmt"
 	"github.com/patrickmn/go-cache"
 	"log"
@@ -9,9 +10,29 @@ import (
 	"torn/treporter"
 )
 
-const IsoLayout = "2006-01-02"
-const DefaultEarliest = "2019-08-24"
-const DefaultLatest = "2019-08-31"
+type DateRange struct {
+	Begin time.Time // inclusive
+	End time.Time // exclusive
+}
+
+func GetDateRangeForCompetition(in string) (*DateRange, error) {
+	times := []time.Time{
+		time.Date(2019, time.August, 24, 0, 0, 0, 0, time.UTC),
+		time.Date(2019, time.August, 31, 0, 0, 0, 0, time.UTC),
+		time.Date(2019, time.September, 7, 0, 0, 0, 0, time.UTC),
+	}
+	switch in {
+	case "1":
+		return &DateRange{times[0], times[1]}, nil
+	case "2":
+		return &DateRange{times[1], times[2]}, nil
+	case "overall":
+		return &DateRange{times[0], times[2]}, nil
+	default:
+		return nil, errors.New("invalid input, expected one of: [1, 2, overall]")
+	}
+
+}
 
 type Server struct {
 	Cache *cache.Cache
@@ -19,63 +40,56 @@ type Server struct {
 }
 
 func (s Server) RefreshCachePeriodically() {
-	earliest, _ := time.Parse(IsoLayout, DefaultEarliest)
-	latest, _ := time.Parse(IsoLayout, DefaultLatest)
+	cacheKeys := []string{"1", "2", "overall"}
 	go func() {
 		for {
-			log.Println("Starting ET cache update")
-			userEnergy, err := s.Reporter.CalculateEnergyTrained(earliest, latest)
-			if err != nil {
-				log.Printf("ERR: Unable to refresh cache on interval: %v", err)
-				time.Sleep(time.Second * 5)
-			} else {
-				log.Println("Successfully updated ET cache")
-				s.Cache.Set("t", userEnergy, time.Second * 30)
-				time.Sleep(time.Second * 15)
+			for _, key := range cacheKeys {
+				log.Println("Starting ET cache update: key=" + key)
+				dateRange, _ := GetDateRangeForCompetition(key)
+				userEnergy, err := s.Reporter.CalculateEnergyTrained(dateRange.Begin, dateRange.End)
+				if err != nil {
+					log.Printf("ERR: Unable to refresh cache (key=%s) on interval: %v", key, err)
+				} else {
+					log.Println("Successfully updated ET cache: key=" + key)
+					s.Cache.Set(key, userEnergy, cache.NoExpiration)
+				}
 			}
+			time.Sleep(time.Second * 5)
 		}
 	}()
 }
 
+func WritePlaintextResponse(statusCode int, message string, w http.ResponseWriter) {
+	w.WriteHeader(statusCode)
+	w.Header().Add("Content-Type", "plain/text")
+	_, err := w.Write([]byte(message))
+	if err != nil {
+		log.Printf("ERR: Unable to write %d response: %v", statusCode, err)
+	}
+}
+
 func (s Server) Handler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Page requested: %s\n", r.Header.Get("X-Forwarded-For"))
-	sEarliest := "2019-08-24"
-	sLatest := "2019-08-31"
-	earliest, eerr := time.Parse(IsoLayout, sEarliest)
-	latest, lerr := time.Parse(IsoLayout, sLatest)
-	if eerr != nil || lerr != nil {
-		log.Printf("WARN: Invalid report date range: earliest=%s, latest=%s, err1=%s, err2=%s\n",
-			earliest, latest, eerr, lerr)
-		w.WriteHeader(http.StatusBadRequest)
-		w.Header().Add("Content-Type", "plain/text")
-		_, err := w.Write([]byte("Unable to parse date range, check [earliest] and [latest] query parameters."))
-		if err != nil {
-			log.Printf("ERR: Unable to write bad date range to response: %v", err)
-		}
+	log.Printf("Page requested: %v\n", r.Header)
+	week := r.URL.Query().Get("week")
+	if week == "" {
+		week = "1"
+	}
+	_, err := GetDateRangeForCompetition(week)
+	if err != nil {
+		WritePlaintextResponse(http.StatusBadRequest, err.Error(), w)
 		return
 	}
 	var userEnergy []treporter.UserEnergy
-	cached, _ := s.Cache.Get("t")
-	if cached != nil {
-		userEnergy = cached.([]treporter.UserEnergy)
-	} else {
-		var err error
-		userEnergy, err = s.Reporter.CalculateEnergyTrained(earliest, latest)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Header().Add("Content-Type", "plain/text")
-			_, err := w.Write([]byte("Oops, something went horribly wrong. Please ping Epi :D"))
-			if err != nil {
-				log.Printf("ERR: Unable to write 500 response: %v", err)
-			}
-			return
-		}
-		s.Cache.Set("t", userEnergy, time.Minute * 1)
+	cached, _ := s.Cache.Get(week)
+	if cached == nil {
+		WritePlaintextResponse(http.StatusInternalServerError, "Oops, something went horribly wrong. Please ping Epi :D", w)
+		return
 	}
+	userEnergy = cached.([]treporter.UserEnergy)
 	w.WriteHeader(http.StatusOK)
 	w.Header().Add("Content-Type", "plain/text")
 	for rank, ue := range userEnergy {
-		_, err := w.Write([]byte(fmt.Sprintf("#%d [%d (%s): %d trained\n", rank+1, ue.User, ue.Name, ue.Energy)))
+		_, err := fmt.Fprintf(w, "#%d [%d (%s)] %d trained\n", rank+1, ue.User, ue.Name, ue.Energy)
 		if err != nil {
 			log.Printf("ERR: Unable to write UserEnergy to response: %v", err)
 		}
