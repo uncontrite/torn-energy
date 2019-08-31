@@ -10,7 +10,7 @@ import (
 	"torn/model"
 )
 
-const UserSelections = "bars,battlestats,jobpoints,personalstats,refills,basic"
+const UserSelections = "bars,battlestats,jobpoints,personalstats,refills,basic,inventory"
 
 type TornClient struct {
 	Client *http.Client
