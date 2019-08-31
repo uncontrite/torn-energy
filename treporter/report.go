@@ -5,6 +5,7 @@ import (
 	"log"
 	"sort"
 	"time"
+	"torn/model"
 	"torn/rethinkdb"
 )
 
@@ -12,19 +13,12 @@ type Args struct {
 	RethinkdbServer string
 }
 
-type UserEnergy struct {
-	User uint
-	Name string
-	Energy int
-}
-
 type Reporter struct {
 	UserDao *rethinkdb.UserDao
 }
 
-func (r Reporter) CalculateEnergyTrained(earliest time.Time, latest time.Time) ([]UserEnergy, error) {
-	energyTrainedPerUser := make(map[uint]int)
-	nameByUserId := make(map[uint]string)
+func (r Reporter) CalculateEnergyTrained(earliest time.Time, latest time.Time) ([]model.UserSummary, error) {
+	summaries := make(map[uint]*model.UserSummary)
 	start := time.Now()
 	userIds, err := r.UserDao.GetUserIds()
 	elapsed := time.Since(start)
@@ -33,6 +27,10 @@ func (r Reporter) CalculateEnergyTrained(earliest time.Time, latest time.Time) (
 		return nil, err
 	}
 	log.Printf("Found %d distinct User IDs: %v", len(userIds), userIds)
+	// Init UserSummaries
+	for _, userId := range userIds {
+		summaries[uint(userId)] = &model.UserSummary{User: uint(userId)}
+	}
 	for _, userId := range userIds {
 		userData, err := r.UserDao.GetInRange(userId, earliest, latest)
 		if err != nil {
@@ -42,26 +40,24 @@ func (r Reporter) CalculateEnergyTrained(earliest time.Time, latest time.Time) (
 			prev := userData[i]
 			next := userData[i+1]
 			udiff := prev.Document.Diff(next.Document)
-			eTrained := udiff.CalculateEnergyTrained()
-			energyTrainedPerUser[prev.Document.UserId] += eTrained
+			udiff.AddToSummary(summaries[prev.Document.UserId])
 		}
 		for i := len(userData)-1; i >= 0; i-- {
 			cur := userData[i]
 			if cur.Document.Name != "" {
-				nameByUserId[cur.Document.UserId] = cur.Document.Name
+				summaries[cur.Document.UserId].Name = cur.Document.Name
 				break
 			}
 		}
 	}
-	var userEnergy []UserEnergy
-	for userId, energyTrained := range energyTrainedPerUser {
-		name, _ := nameByUserId[userId]
-		userEnergy = append(userEnergy, UserEnergy{userId, name, energyTrained})
+	var result []model.UserSummary
+	for _, summary := range summaries {
+		result = append(result, *summary)
 	}
-	sort.SliceStable(userEnergy, func(i, j int) bool {
-		return userEnergy[i].Energy > userEnergy[j].Energy
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].Energy > result[j].Energy
 	})
-	return userEnergy, nil
+	return result, nil
 }
 
 type KV struct {

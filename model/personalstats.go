@@ -80,7 +80,7 @@ func (ps PersonalStats) GetEvents() []string {
 	if ps.EnergyDrinkUsed > 0 {
 		events = append(events, "gained 30e* by consuming an energy drink")
 	}
-	// Booster can be FHC or EDVD; can guesstimate based on User data; determine at that level
+	// Booster can be FHCs or EDVDs; can guesstimate based on User data; determine at that level
 	// if ps.BoostersUsed > 0 {}
 	if ps.ConsumablesUsed > 0 {
 		events = append(events, "ate ass")

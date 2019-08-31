@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"time"
+	"torn/model"
 	"torn/treporter"
 )
 
@@ -79,19 +80,20 @@ func (s Server) Handler(w http.ResponseWriter, r *http.Request) {
 		WritePlaintextResponse(http.StatusBadRequest, err.Error(), w)
 		return
 	}
-	var userEnergy []treporter.UserEnergy
+	var userSummary []model.UserSummary
 	cached, _ := s.Cache.Get(week)
 	if cached == nil {
 		WritePlaintextResponse(http.StatusInternalServerError, "Oops, something went horribly wrong. Please ping Epi :D", w)
 		return
 	}
-	userEnergy = cached.([]treporter.UserEnergy)
+	userSummary = cached.([]model.UserSummary)
 	w.WriteHeader(http.StatusOK)
 	w.Header().Add("Content-Type", "plain/text")
-	for rank, ue := range userEnergy {
-		_, err := fmt.Fprintf(w, "#%d [%d (%s)] %d trained\n", rank+1, ue.User, ue.Name, ue.Energy)
+	for rank, ue := range userSummary {
+		_, err := fmt.Fprintf(w, "#%d [%d (%s)] %d trained [fhc=%d, xan=%d, prf=%d, lsd=%d, cans=%d, edvds=%d, jpEnergy=%d, attacks=%d]\n",
+			rank+1, ue.User, ue.Name, ue.Energy, ue.FHCs, ue.Xanax, ue.EnergyRefills, ue.LSD, ue.EnergyDrinks, ue.EDVDs, ue.JpEnergy, ue.Attacks)
 		if err != nil {
-			log.Printf("ERR: Unable to write UserEnergy to response: %v", err)
+			log.Printf("ERR: Unable to write UserSummary to response: %v", err)
 		}
 	}
 }
