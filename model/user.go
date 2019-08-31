@@ -3,6 +3,8 @@ package model
 import (
 	"encoding/json"
 	"errors"
+	"reflect"
+	"sort"
 )
 
 type RawUser struct {
@@ -24,6 +26,7 @@ type RawUser struct {
 	JobPoints     RawJobPoints  `json:"jobpoints,omitempty"`
 	PersonalStats PersonalStats `json:"personalstats,omitempty"`
 	Refills       Refills       `json:"refills,omitempty"`
+	Inventory     []Item		`json:"inventory,omitempty"`
 }
 
 type User struct {
@@ -34,6 +37,42 @@ type User struct {
 	Jobs          []Job         `json:"jobs,omitempty"`
 	PersonalStats PersonalStats `json:"personalstats,omitempty"`
 	Refills       Refills       `json:"refills,omitempty"`
+	Items		  []Item		`json:"inventory,omitempty"`
+}
+
+const (
+	FHC = 367
+	EDVD = 366
+)
+
+type Item struct {
+	Id int `json:"ID,omitempty"` // FHC, EDVD consts above
+	Quantity int `json:"quantity,omitempty"`
+}
+
+func (i Item) Diff(other Item) Item {
+	return Item{
+		Id: i.Id,
+		Quantity: other.Quantity - i.Quantity,
+	}
+}
+
+func CalculateItemDiffs(prev []Item, curr []Item) []Item {
+	items := make(map[int]int)
+	for _, item := range curr {
+		items[item.Id] = item.Quantity
+	}
+	for _, item := range prev {
+		items[item.Id] -= item.Quantity
+	}
+	var result []Item
+	for id, quantity := range items {
+		result = append(result, Item{id, quantity})
+	}
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].Id < result[j].Id
+	})
+	return result
 }
 
 func (u User) Equals(other interface{}) bool {
@@ -45,7 +84,8 @@ func (u User) Equals(other interface{}) bool {
 		u.Bars.Equals(other.(User).Bars) &&
 		Eq(u.Jobs, other.(User).Jobs) &&
 		u.PersonalStats == other.(User).PersonalStats &&
-		u.Refills == other.(User).Refills
+		u.Refills == other.(User).Refills &&
+		reflect.DeepEqual(u.Items, other.(User).Items)
 }
 
 func (raw RawUser) Bars() Bars {
@@ -61,7 +101,7 @@ func (raw RawUser) User() (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &User{raw.PlayerId, raw.Name, raw.BattleStats(), raw.Bars(), jobs, raw.PersonalStats, raw.Refills}, nil
+	return &User{raw.PlayerId, raw.Name, raw.BattleStats(), raw.Bars(), jobs, raw.PersonalStats, raw.Refills, raw.Inventory}, nil
 }
 
 func (u User) MarshalJson() ([]byte, error) {
@@ -83,6 +123,13 @@ func (u *User) UnmarshalJSON(b []byte) error {
 			err = innerErr
 			if innerUser != nil {
 				*u = *innerUser
+				var newItems []Item
+				for _, item := range u.Items {
+					if item.Id == FHC || item.Id == EDVD {
+						newItems = append(newItems, item)
+					}
+				}
+				u.Items = newItems
 			}
 		}
 		break

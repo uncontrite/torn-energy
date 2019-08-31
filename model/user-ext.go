@@ -2,7 +2,6 @@ package model
 
 import (
 	"fmt"
-	"sort"
 )
 
 type UserDiff struct {
@@ -19,32 +18,8 @@ func (u User) Diff(u2 User) UserDiff {
 	diff.Refills = u.Refills.Diff(u2.Refills)
 	diff.UserId = u.UserId
 	diff.MaxEnergy = u.Bars.Energy.Maximum
+	diff.Items = CalculateItemDiffs(u.Items, u2.Items)
 	return diff
-}
-
-func (u UserDiff) IsRelevant() ([]string, map[string]struct{}) {
-	var reasons []string
-	if u.IsTrain() {
-		reasons = append(reasons, "train")
-	}
-	if u.Refills.EnergyRefillUsed || u.Refills.SpecialRefillsAvailable < 0 {
-		reasons = append(reasons, "prf")
-	}
-	for _, j := range u.Jobs {
-		if j.Points < 0 {
-			reasons = append(reasons, "jp")
-			break
-		}
-	}
-	reasons = append(reasons, u.PersonalStats.IsDiffRelevant()...)
-	sort.SliceStable(reasons, func(i, j int) bool {
-		return reasons[i] < reasons[j]
-	})
-	m := make(map[string]struct{})
-	for _, r := range reasons {
-		m[r] = struct{}{}
-	}
-	return reasons, m
 }
 
 func (u UserDiff) GetEvents() []string {
