@@ -81,7 +81,7 @@ func CalculateBoosterSplit(prevHappy int, currHappy int, ecstasyTaken int, boost
 	var fhc int
 	boosters := boostersTaken
 	if boosters > 0 {
-		if currEnergy > 150 { // Power training
+		if currEnergy >= 400 { // Power training
 			return 0, boostersTaken
 		}
 		happy := currHappy

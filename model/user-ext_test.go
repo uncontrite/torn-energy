@@ -268,6 +268,7 @@ func TestCalculateBoosterSplit(t *testing.T) {
 		{"Mix", args{5000, 7920, 0, 2, 0, 0, false}, 1, 1},
 		{"Happy Reset", args{33482, 4500, 0, 1, 0, 0, true}, 1, 0},
 		{"Noffin 1", args{9500, 14500, 0, 3, 0, 950, false}, 0, 3},
+		{"El Trippo", args{7486, 7914, 0, 1, 0, 250, true}, 1, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
