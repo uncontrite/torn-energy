@@ -6,6 +6,7 @@ import (
 	"github.com/patrickmn/go-cache"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 	"torn/model"
 	"torn/treporter"
@@ -89,9 +90,17 @@ func (s Server) Handler(w http.ResponseWriter, r *http.Request) {
 	userSummary = cached.([]model.UserSummary)
 	w.WriteHeader(http.StatusOK)
 	w.Header().Add("Content-Type", "plain/text")
+	prefixes := []string{"fhc", "xan", "prf", "lsd", "cans", "edvds", "jpEnergy", "attacks", "ods"}
 	for rank, ue := range userSummary {
-		_, err := fmt.Fprintf(w, "#%d [%d (%s)] %d trained [fhc=%d, xan=%d, prf=%d, lsd=%d, cans=%d, edvds=%d, jpEnergy=%d, attacks=%d]\n",
-			rank+1, ue.User, ue.Name, ue.Energy, ue.FHCs, ue.Xanax, ue.EnergyRefills, ue.LSD, ue.EnergyDrinks, ue.EDVDs, ue.JpEnergy, ue.Attacks)
+		var str1, str2 strings.Builder
+		values := []int{ue.FHCs, ue.Xanax, ue.EnergyRefills, ue.LSD, ue.EnergyDrinks, ue.EDVDs, ue.JpEnergy, ue.Attacks, ue.Overdoses}
+		for i, v := range values {
+			if v > 0 {
+				str2.WriteString(fmt.Sprintf("%s=%d, ", prefixes[i], v))
+			}
+		}
+		str1.WriteString(fmt.Sprintf("#%d [%d (%s)] %d trained [%s]", rank+1, ue.User, ue.Name, ue.Energy, strings.TrimSuffix(str2.String(), ", ")))
+		_, err := fmt.Fprintln(w, str1.String())
 		if err != nil {
 			log.Printf("ERR: Unable to write UserSummary to response: %v", err)
 		}
