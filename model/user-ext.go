@@ -133,7 +133,7 @@ func (u UserDiff) CalculateEnergyTrained() int {
 	attacksEnergy := -25 * attacks
 	dumpEnergy := -5 * ps.DumpSearches
 	energyDrinkEnergy := 30 * ps.EnergyDrinkUsed
-	// Heuristic to split Booster into FHC v. EDVD
+	// Heuristic to split Booster into FHCs v. EDVDs
 	fhc, _ := CalculateBoosterSplit(u.Bars.Happy.Previous, u.Bars.Happy.Current, u.PersonalStats.EcstasyTaken,
 		u.PersonalStats.BoostersUsed)
 	fhcEnergy := 150 * fhc
@@ -143,4 +143,38 @@ func (u UserDiff) CalculateEnergyTrained() int {
 	eTrained := u.Bars.Energy.Previous + prfEnergy + xanEnergy + lsdEnergy + unspentEnergy + attacksEnergy +
 		dumpEnergy + energyDrinkEnergy + fhcEnergy + jpEnergy
 	return eTrained
+}
+
+type UserSummary struct {
+	User          uint
+	Name          string
+	Energy        int
+	FHCs          int
+	Xanax         int
+	LSD           int
+	EnergyDrinks  int
+	Attacks       int
+	EnergyRefills int
+	EDVDs         int
+	Dumps         int
+	JpEnergy	  int
+}
+
+func (u UserDiff) AddToSummary(summary *UserSummary) {
+	summary.EnergyRefills += u.PersonalStats.Refills
+	summary.Xanax += u.PersonalStats.XanaxTaken
+	summary.LSD += u.PersonalStats.LsdTaken
+	ps := u.PersonalStats
+	summary.Attacks += ps.AttacksWon + ps.AttacksLost + ps.AttacksDraw + ps.AttacksAssisted + ps.YouRunAway
+	summary.Dumps += ps.DumpSearches
+	summary.EnergyDrinks += ps.EnergyDrinkUsed
+
+	// Heuristic to split Booster into FHCs v. EDVDs
+	fhc, edvd := CalculateBoosterSplit(u.Bars.Happy.Previous, u.Bars.Happy.Current, u.PersonalStats.EcstasyTaken,
+		u.PersonalStats.BoostersUsed)
+	summary.FHCs += fhc
+	summary.EDVDs += edvd
+	jpEnergy, _ := u.CalculateEnergyGainedFromJobPoints()
+	summary.JpEnergy += jpEnergy
+	summary.Energy += u.CalculateEnergyTrained()
 }

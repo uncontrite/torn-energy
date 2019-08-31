@@ -261,7 +261,7 @@ func TestCalculateBoosterSplit(t *testing.T) {
 		{"FHC3", args{5364, 6134, 0, 2}, 2, 0},
 		{"FHC4", args{6134, 7486, 0, 3}, 3, 0},
 		{"FHC5", args{7486, 7914, 0, 1}, 1, 0},
-		{"EDVD", args{9500, 33776, 1, 3}, 0, 3},
+		{"EDVDs", args{9500, 33776, 1, 3}, 0, 3},
 		{"Mix", args{5000, 7920, 0, 2}, 1, 1},
 
 	}
