@@ -72,7 +72,7 @@ func (s Server) Handler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Page requested: %v\n", r.Header)
 	week := r.URL.Query().Get("week")
 	if week == "" {
-		week = "1"
+		week = "2"
 	}
 	_, err := GetDateRangeForCompetition(week)
 	if err != nil {
