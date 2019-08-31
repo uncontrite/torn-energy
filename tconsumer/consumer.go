@@ -19,8 +19,8 @@ type Args struct {
 	RethinkdbServer string
 }
 
-const GroupIdV1 = "rethinkdb-tconsumer"
-const GroupIdV3 = "rethinkdb-tconsumer-v3"
+const GroupIdV1 = "rethinkdb-tconsumer-v4"
+const GroupIdV3 = "rethinkdb-tconsumer-v5"
 
 func SetUpConsumer(bootstrapServer string, groupId string) (*kafka.Consumer, func()) {
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
@@ -65,6 +65,7 @@ func RethinkdbStoringConsumer(consumer *kafka.Consumer, userDao rethinkdb.UserDa
 	go func() {
 		for {
 			msg, err := consumer.ReadMessage(time.Second * 5)
+			msg.TopicPartition.Offset += 60000 // Welp, Kafka topic got blown away on instance resize
 			// TODO: Retry errors
 			if err != nil {
 				atomic.AddUint64(&kerrs, 1)
