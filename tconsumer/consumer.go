@@ -121,6 +121,16 @@ type UserPair struct {
 	Curr *rethinkdb.RethinkTornUser
 }
 
+type TrainEvent struct {
+
+}
+
+type UserEvent struct {
+	EventType string // enum?
+	Modifies string // enum?
+	Change string // e.g. "attack" event type modifies "energy" by "-25"
+}
+
 // WIP
 func RunConsumerV3(args Args, done chan bool) {
 	consumer, closer := SetUpConsumer(args.BootstrapServer, GroupIdV3)
@@ -146,6 +156,7 @@ func RunConsumerV3(args Args, done chan bool) {
 	// Adapt Kafka Message to User
 	users := make(chan *rethinkdb.RethinkTornUser, 4)
 	min := time.Date(2019, time.August, 24, 0, 0, 0, 0, time.UTC)
+	max := time.Date(2019, time.August, 31, 0, 0, 0, 0, time.UTC)
 	go func() {
 		for {
 			//log.Println("Converting message to User")
@@ -156,7 +167,7 @@ func RunConsumerV3(args Args, done chan bool) {
 				continue
 			}
 			// TODO: Remove filtering
-			if dbUser.Timestamp.Before(min) {
+			if dbUser.Timestamp.Before(min) || dbUser.Timestamp.After(max) {
 				continue
 			}
 			s, _ := json.Marshal(dbUser)
@@ -170,7 +181,6 @@ func RunConsumerV3(args Args, done chan bool) {
 	prevs := make(map[uint]*rethinkdb.RethinkTornUser)
 	go func() {
 		for {
-			//log.Println("Pairing User updates")
 			user := <-users
 			prev, exists := prevs[user.Document.UserId]
 			if exists {
