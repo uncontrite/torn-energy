@@ -249,6 +249,9 @@ func TestCalculateBoosterSplit(t *testing.T) {
 		currHappy     int
 		ecstasyTaken  int
 		boostersTaken int
+		od  		  int
+		currEnergy	  int
+		train         bool
 	}
 	tests := []struct {
 		name  string
@@ -256,23 +259,26 @@ func TestCalculateBoosterSplit(t *testing.T) {
 		want  int
 		want1 int
 	}{
-		{"FHC1", args{4779, 5209, 0, 1}, 1, 0},
-		{"FHC2", args{4983, 7874, 0, 7}, 7, 0},
-		{"FHC3", args{5364, 6134, 0, 2}, 2, 0},
-		{"FHC4", args{6134, 7486, 0, 3}, 3, 0},
-		{"FHC5", args{7486, 7914, 0, 1}, 1, 0},
-		{"EDVDs", args{9500, 33776, 1, 3}, 0, 3},
-		{"Mix", args{5000, 7920, 0, 2}, 1, 1},
-
+		{"FHC1", args{4779, 5209, 0, 1, 0, 0, false}, 1, 0},
+		{"FHC2", args{4983, 7874, 0, 7, 0, 0, false}, 7, 0},
+		{"FHC3", args{5364, 6134, 0, 2, 0, 0, false}, 2, 0},
+		{"FHC4", args{6134, 7486, 0, 3, 0, 0, false}, 3, 0},
+		{"FHC5", args{7486, 7914, 0, 1, 0, 0, false}, 1, 0},
+		{"EDVDs", args{9500, 33776, 1, 3, 0, 0, false}, 0, 3},
+		{"Mix", args{5000, 7920, 0, 2, 0, 0, false}, 1, 1},
+		{"Happy Reset", args{33482, 4500, 0, 1, 0, 0, true}, 1, 0},
+		{"Noffin 1", args{9500, 14500, 0, 3, 0, 950, false}, 0, 3},
+		{"El Trippo", args{7486, 7914, 0, 1, 0, 250, true}, 1, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := CalculateBoosterSplit(tt.args.prevHappy, tt.args.currHappy, tt.args.ecstasyTaken, tt.args.boostersTaken)
+			got, got1 := CalculateBoosterSplit(tt.args.prevHappy, tt.args.currHappy, tt.args.ecstasyTaken,
+				tt.args.boostersTaken, tt.args.od, tt.args.currEnergy, tt.args.train)
 			if got != tt.want {
-				t.Errorf("CalculateBoosterSplit() got = %v, want %v", got, tt.want)
+				t.Errorf("CalculateBoosterSplit() (fhc) got = %v, want %v", got, tt.want)
 			}
 			if got1 != tt.want1 {
-				t.Errorf("CalculateBoosterSplit() got1 = %v, want %v", got1, tt.want1)
+				t.Errorf("CalculateBoosterSplit() (edvd) got = %v, want %v", got1, tt.want1)
 			}
 		})
 	}

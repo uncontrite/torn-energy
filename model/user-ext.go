@@ -55,7 +55,8 @@ func (u UserDiff) GetEvents() []string {
 	if jpEnergyGained, jpSpent := u.CalculateEnergyGainedFromJobPoints(); jpEnergyGained > 0 {
 		events = append(events, fmt.Sprintf("gained %de by spending %d job points", jpEnergyGained, jpSpent))
 	}
-	fhc, edvd := CalculateBoosterSplit(u.Bars.Happy.Previous, u.Bars.Happy.Current, u.PersonalStats.EcstasyTaken, u.PersonalStats.BoostersUsed)
+	fhc, edvd := CalculateBoosterSplit(u.Bars.Happy.Previous, u.Bars.Happy.Current, u.PersonalStats.EcstasyTaken,
+		u.PersonalStats.BoostersUsed, u.PersonalStats.Overdosed, u.Bars.Energy.Current, u.IsTrain())
 	if fhc > 0 {
 		events = append(events, fmt.Sprintf("gained %de* by using %d FHCs", 150 * fhc, fhc))
 	}
@@ -75,16 +76,25 @@ func (u UserDiff) IsTrain() bool {
 }
 
 // returns (fhc, edvd)
-func CalculateBoosterSplit(prevHappy int, currHappy int, ecstasyTaken int, boostersTaken int) (int, int) {
+func CalculateBoosterSplit(prevHappy int, currHappy int, ecstasyTaken int, boostersTaken int, od int, currEnergy int, train bool) (int, int) {
 	var edvd int
 	var fhc int
 	boosters := boostersTaken
 	if boosters > 0 {
+		if currEnergy >= 400 { // Power training
+			return 0, boostersTaken
+		}
 		happy := currHappy
 		if ecstasyTaken > 0 {
 			happy /= 2
 		}
 		happy -= prevHappy
+		if happy <= -5000 && currHappy > 10 && od == 0 { // Happy reset
+			if train {
+				return boostersTaken, 0
+			}
+			return 0, boostersTaken
+		}
 		// 400f + 2400e = h
 		// f + e = b => 400f + 400e = 400b
 		// --------
@@ -135,7 +145,7 @@ func (u UserDiff) CalculateEnergyTrained() int {
 	energyDrinkEnergy := 30 * ps.EnergyDrinkUsed
 	// Heuristic to split Booster into FHCs v. EDVDs
 	fhc, _ := CalculateBoosterSplit(u.Bars.Happy.Previous, u.Bars.Happy.Current, u.PersonalStats.EcstasyTaken,
-		u.PersonalStats.BoostersUsed)
+		u.PersonalStats.BoostersUsed, u.PersonalStats.Overdosed, u.Bars.Energy.Current, u.IsTrain())
 	fhcEnergy := 150 * fhc
 
 	unspentEnergy := -1 * u.Bars.Energy.Current
@@ -158,6 +168,7 @@ type UserSummary struct {
 	EDVDs         int
 	Dumps         int
 	JpEnergy	  int
+	Overdoses	  int
 }
 
 func (u UserDiff) AddToSummary(summary *UserSummary) {
@@ -171,7 +182,8 @@ func (u UserDiff) AddToSummary(summary *UserSummary) {
 
 	// Heuristic to split Booster into FHCs v. EDVDs
 	fhc, edvd := CalculateBoosterSplit(u.Bars.Happy.Previous, u.Bars.Happy.Current, u.PersonalStats.EcstasyTaken,
-		u.PersonalStats.BoostersUsed)
+		u.PersonalStats.BoostersUsed, u.PersonalStats.Overdosed, u.Bars.Energy.Current, u.IsTrain())
+	summary.Overdoses += ps.Overdosed
 	summary.FHCs += fhc
 	summary.EDVDs += edvd
 	jpEnergy, _ := u.CalculateEnergyGainedFromJobPoints()
