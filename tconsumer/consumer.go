@@ -71,7 +71,7 @@ func RethinkdbStoringConsumer(consumer *kafka.Consumer, userDao rethinkdb.UserDa
 				log.Printf("Consumer error: %v (%v)\n", err, msg)
 				continue
 			}
-			msg.TopicPartition.Offset += 60000 // Welp, Kafka topic got blown away on instance resize
+			msg.TopicPartition.Offset += 70000 // Welp, Kafka topic got blown away on instance resize
 			offset := msg.TopicPartition.Offset
 			stored, err := userDao.Exists(int64(offset))
 			if err != nil {
